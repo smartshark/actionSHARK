@@ -4,8 +4,8 @@ from requests.auth import HTTPBasicAuth
 
 
 class GitHub():
-    '''
-    Managing different type of get Request to fetch data from GitHub REST API'''
+    """
+    Managing different type of get Request to fetch data from GitHub REST API"""
 
     base_url = 'https://api.github.com/'
 
@@ -18,8 +18,8 @@ class GitHub():
 
 
     def __init__(self, file_path: str = None) -> None:
-        '''
-        Extract Token from settings file for Authentication'''
+        """
+        Extract Token from settings file for Authentication"""
         if not file_path: raise f'ERROR: Add the path to JSON file with Access Token'
 
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -43,15 +43,15 @@ class GitHub():
             print(f'ERROR: {response.reason}')
 
     def query_string(self, q: dict):
-        '''
-        Reformatting deictionry to GitHub API URL syntax'''
+        """
+        Reformatting deictionry to GitHub API URL syntax"""
         return '&'.join(['='.join(i) for i in q.items()])
 
 
 
     def get_search_response(self, search_type: str, q: dict = None, save_path: str = None):
-        '''
-        constructing URL to fetch responses'''
+        """
+        constructing URL to fetch responses"""
         if search_type in self.search_types:
             url = self.base_url + self.search_types[search_type]
         else:
@@ -73,8 +73,8 @@ class GitHub():
 
 
     def get_action_response(self, owner: str = None, repo: str = None, pp_results: int = 100, page_number: int = 1, save_path: str = None):
-        '''
-        constructing URL to fetch actions'''
+        """
+        constructing URL to fetch actions"""
         if not owner or not repo: raise 'Please make to sure to pass both the owner and repo names.'
 
         url = 'repos/{owner}/{repo}/actions/workflows'
@@ -91,8 +91,8 @@ class GitHub():
 
     def get_orgnization_repostries(self, orgnization: str = None, save_path: str = None):
 
-        '''
-        constructing URL to fetch repos permissions'''
+        """
+        constructing URL to fetch repos permissions"""
         if not orgnization : raise 'Please pass the orgnization name.'
 
         # url = 'orgs/{org}/actions/permissions/repositories'
@@ -109,12 +109,13 @@ class GitHub():
 
 
     def get_action_runs_response(self, owner: str = None, repo: str = None, pp_results: int = 100, page_number: int = 1, save_path: str = None):
-        '''
-        constructing URL to fetch actions'''
+        """
+        constructing URL to fetch actions"""
         if not owner or not repo: raise 'Please make to sure to pass both the owner and repo names.'
 
         url = 'repos/{owner}/{repo}/actions/runs'
-        github_url = self.base_url + url.format(owner=owner, repo=repo) + f'?per_page={pp_results}&paage={page_number}'
+        # github_url = self.base_url + url.format(owner=owner, repo=repo) + f'?per_page={pp_results}&paage={page_number}'
+        github_url = self.base_url + url.format(owner=owner, repo=repo)
 
         response = requests.request('GET', github_url, headers=self.headers)
 
