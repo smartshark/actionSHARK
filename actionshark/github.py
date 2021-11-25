@@ -32,7 +32,7 @@ class GitHub():
 
 
 
-    def save_response_JSON(self, save_path: str, response: requests.models.Response):
+    def save_JSON(self, save_path: str, response: requests.models.Response):
         if response.status_code == 200:
             print('Successful Request!')
             with open( save_path, 'w', encoding='utf-8') as f:
@@ -49,7 +49,7 @@ class GitHub():
 
 
 
-    def get_search_response(self, search_type: str, q: dict = None, save_path: str = None):
+    def get_search(self, search_type: str, q: dict = None, save_path: str = None):
         """
         constructing URL to fetch responses"""
         if search_type in self.search_types:
@@ -67,12 +67,12 @@ class GitHub():
 
 
         if not save_path:
-            save_path = f'./data/response_search_{search_type}.json'
-        self.save_response_JSON(save_path, response)
+            save_path = f'./data/search/search_{search_type}.json'
+        self.save_JSON(save_path, response)
 
 
 
-    def get_action_response(self, owner: str = None, repo: str = None, pp_results: int = 100, page_number: int = 1, save_path: str = None):
+    def get_workflow(self, owner: str = None, repo: str = None, pp_results: int = 100, page_number: int = 1, save_path: str = None):
         """
         constructing URL to fetch actions"""
         if not owner or not repo: raise 'Please make to sure to pass both the owner and repo names.'
@@ -83,9 +83,9 @@ class GitHub():
         response = requests.request('GET', github_url, headers=self.headers)
 
         if not save_path:
-            save_path = f'./data/{owner}_{repo}_action_workflows.json'
+            save_path = f'./data/workflows/{owner}_{repo}_workflows.json'
 
-        self.save_response_JSON(save_path, response)
+        self.save_JSON(save_path, response)
 
 
 
@@ -102,13 +102,13 @@ class GitHub():
         response = requests.request('GET', github_url, headers=self.headers)
 
         if not save_path:
-            save_path = f'./data/{orgnization}_repos.json'
+            save_path = f'./data/repos/{orgnization}_repos.json'
 
-        self.save_response_JSON(save_path, response)
+        self.save_JSON(save_path, response)
 
 
 
-    def get_action_runs_response(self, owner: str = None, repo: str = None, pp_results: int = 100, page_number: int = 1, save_path: str = None):
+    def get_workflow_runs(self, owner: str = None, repo: str = None, pp_results: int = 100, page_number: int = 1, save_path: str = None):
         """
         constructing URL to fetch actions"""
         if not owner or not repo: raise 'Please make to sure to pass both the owner and repo names.'
@@ -120,9 +120,22 @@ class GitHub():
         response = requests.request('GET', github_url, headers=self.headers)
 
         if not save_path:
-            save_path = f'./data/{owner}_{repo}_action_runs.json'
+            save_path = f'./data/runs/{owner}_{repo}_runs.json'
 
-        self.save_response_JSON(save_path, response)
+        self.save_JSON(save_path, response)
+
+
+    def get_workflow_runs_artifacts(self, owner: str = None, repo: str = None, run_id: int = None, pp_results: int = 100, page_number: int = 1, save_path: str = None):
+        if not owner or not repo or not run_id: raise 'Please make to sure to pass both the owner and repo names.'
+        url = '/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
+        github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id)
+
+        response = requests.request('GET', github_url, headers=self.headers)
+
+        if not save_path:
+            save_path = f'./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
+
+        self.save_JSON(save_path, response)
 
 if __name__ == '__main__':
 
@@ -134,12 +147,12 @@ if __name__ == '__main__':
         'star' : '>50',
         'label' : 'open'
     }
-    cls.get_search_response('issues', q)
+    cls.get_search('issues', q)
 
 
     # Get all organization
     q = {'type':'org'}
-    cls.get_search_response('users', q)
+    cls.get_search('users', q)
 
     # owner_name = 'smartshark'
     # repo_name = 'issueSHARK'
@@ -147,8 +160,8 @@ if __name__ == '__main__':
     owner_name = 'fireship-io'
     # repo_name = 'fireship' # neither artifacts or workflows
     repo_name = '225-github-actions-demo' # only workflows
-    cls.get_action_response(owner_name, repo_name)
-    cls.get_action_runs_response(owner_name, repo_name)
+    cls.get_workflow(owner_name, repo_name)
+    cls.get_workflow_runs(owner_name, repo_name)
 
     org_name = 'fireship-io'
     cls.get_orgnization_repostries(org_name)
