@@ -38,9 +38,13 @@ class GitHub():
             with open( save_path, 'w', encoding='utf-8') as f:
                 json.dump(response.json(), f, indent=4)
             print(f'Response is saved in {save_path}')
+            print('-'*60)
         else:
             print(f'ERROR: {response.status_code}')
             print(f'ERROR: {response.reason}')
+            print('-'*60)
+
+
 
     def query_string(self, q: dict):
         """
@@ -125,12 +129,15 @@ class GitHub():
         self.save_JSON(save_path, response)
 
 
+
     def get_workflow_runs_artifacts(self, owner: str = None, repo: str = None, run_id: int = None, pp_results: int = 100, page_number: int = 1, save_path: str = None):
         if not owner or not repo or not run_id: raise 'Please make to sure to pass both the owner and repo names.'
-        url = '/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
+        url = 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id)
 
         response = requests.request('GET', github_url, headers=self.headers)
+
+        # print(github_url)
 
         if not save_path:
             save_path = f'./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
@@ -142,29 +149,41 @@ if __name__ == '__main__':
 
     cls = GitHub('settings.json')
 
-    q = {
-        'language' : 'python',
-        'star' : '>50',
-        'label' : 'open'
-    }
-    cls.get_search('issues', q)
+    # q = {
+    #     'language' : 'python',
+    #     'star' : '>50',
+    #     'label' : 'open'
+    # }
+    # cls.get_search('issues', q)
 
 
     # Get all organization
-    q = {'type':'org'}
-    cls.get_search('users', q)
+    # q = {'type':'org'}
+    # cls.get_search('users', q)
 
     # owner_name = 'smartshark'
     # repo_name = 'issueSHARK'
 
-    owner_name = 'fireship-io'
-    # repo_name = 'fireship' # neither artifacts or workflows
-    repo_name = '225-github-actions-demo' # only workflows
-    cls.get_workflow(owner_name, repo_name)
-    cls.get_workflow_runs(owner_name, repo_name)
+    # owner_name = 'fireship-io'
+    # # repo_name = 'fireship' # neither artifacts or workflows
+    # repo_name = '225-github-actions-demo' # only workflows
+    # cls.get_workflow(owner_name, repo_name)
+    # cls.get_workflow_runs(owner_name, repo_name)
 
-    org_name = 'fireship-io'
-    cls.get_orgnization_repostries(org_name)
+    # org_name = 'fireship-io'
+    # cls.get_orgnization_repostries(org_name)
 
-    org_name = 'smartshark'
-    cls.get_orgnization_repostries(org_name)
+    # org_name = 'smartshark'
+    # cls.get_orgnization_repostries(org_name)
+
+    # get all artifacts for runs
+    with open ('./data/fireship-io_225-github-actions-demo_action_runs.json', 'r', encoding='utf-8') as f:
+        runs = json.load(f)
+
+    count_runs = 0
+    for run in runs['workflow_runs']:
+        # print(run['repository']['owner']['login'],run['repository']['name'],type(run['id']) )
+        count_runs += 1
+        cls.get_workflow_runs_artifacts(run['repository']['owner']['login'],run['repository']['name'],run['id'])
+        # break
+    print('count_runs:', count_runs)
