@@ -54,21 +54,21 @@ class GitHub():
 
 
 
-    def query_string(self, q: dict):
-        """Reformatting deictionry to GitHub API URL syntax.
+    def parameter_constructor(self, q: dict):
+        """Reformatting dictionary to GitHub API URL syntax.
 
         Args:
             q (dict): Query parameters as dictionary.
 
         Returns:
-            str: Query strin to add to GitHub URL
+            str: Query string to add to GitHub URL
         """
         return '&'.join(['='.join(i) for i in q.items()])
 
 
 
     def get_search_types(self) -> list[str]:
-        return [key for key in self.search_types.keys()]
+        return [key for key in self.__search_types.keys()]
 
 
 
@@ -81,13 +81,13 @@ class GitHub():
             save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/search/search_{search_type}.json".
             verbose (bool): Print extra information to console.
         """
-        if search_type in self.search_types:
-            url = self.base_url + self.search_types[search_type]
+        if search_type in self.__search_types:
+            url = self.base_url + self.__search_types[search_type]
         else:
             print('Unrecognized / Unsupported search criteria!')
 
         if q != None:
-            q = self.query_string(q)
+            q = self.parameter_constructor(q)
             github_url = url + '?q=' + q
         else:
             github_url = url
@@ -104,11 +104,11 @@ class GitHub():
 
 
     def get_workflow(self, owner: Optional[str] = None, repo: Optional[str] = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
-        """Fetching workflows data from GitHub API for specific reposotory and owner.
+        """Fetching workflows data from GitHub API for specific repository and owner.
 
         Args:
-            owner (Optional[str], optional): Owner of the reposotory. Defaults to None.
-            repo (Optional[str], optional): Name of the reposotory. Defaults to None.
+            owner (Optional[str], optional): Owner of the repository. Defaults to None.
+            repo (Optional[str], optional): Name of the repository. Defaults to None.
             save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/workflows/{owner}_{repo}_workflows.json".
             verbose (bool): Print extra information to console.
         """
@@ -128,44 +128,50 @@ class GitHub():
 
 
 
-    def get_orgnization_repostries(self, orgnization: Optional[str] = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
-        """Fetching reosotories data from GitHub API for specific orgnization.
+    def get_organization_repostries(self, organization: Optional[str] = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+        """Fetching repositories data from GitHub API for specific organization.
 
         Args:
-            orgnization (Optional[str], optional): Orgnization name. Defaults to None.
-            save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/repos/{orgnization}_repos.json".
+            organization (Optional[str], optional): Organization name. Defaults to None.
+            save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/repos/{organization}_repos.json".
             verbose (bool): Print extra information to console.
         """
-        if not orgnization : raise 'Please pass the orgnization name.'
+        if not organization : raise 'Please pass the organization name.'
 
         # url = 'orgs/{org}/actions/permissions/repositories'
         url = 'orgs/{org}/repos'
-        github_url = self.base_url + url.format(org=orgnization)
+        github_url = self.base_url + url.format(org=organization)
 
         response = requests.request('GET', github_url, headers=self.headers)
 
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
-            save_path = f'./data/repos/{orgnization}_repos.json'
+            save_path = f'./data/repos/{organization}_repos.json'
 
         self.save_JSON(save_path, response)
 
 
 
-    def get_workflow_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
-        """Fetching workflow runs data from GitHub API for specific reposotory and owner.
+    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, created = None, exclude_pull_requests: bool = False, save_path: Optional[str] = None, verbose: bool = False) -> None:
+        """Fetching workflow runs data from GitHub API for specific repository and owner.
 
         Args:
-            owner (Optional[str], optional): Owner of the reposotory. Defaults to None.
-            repo (Optional[str], optional): Name of the reposotory. Defaults to None.
+            owner (Optional[str], optional): Owner of the repository. Defaults to None.
+            repo (Optional[str], optional): Name of the repository. Defaults to None.
             save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/runs/{owner}_{repo}_runs.json".
             verbose (bool): Print extra information to console.
         """
+
+        # https://api.github.com/repos/freeCodeCamp/freeCodeCamp/actions/runs?page=1&per_page=100&sort=created_at&order=desc&created=2021-11-28
+
         if not owner or not repo: raise 'Please make to sure to pass both the owner and repo names.'
 
+        q = {'per_page': per_page, 'page': page, 'created': created, 'exclude_pull_requests': exclude_pull_requests}
+        if not created: del q['created']
+
         url = 'repos/{owner}/{repo}/actions/runs'
-        github_url = self.base_url + url.format(owner=owner, repo=repo)
+        github_url = self.base_url + url.format(owner=owner, repo=repo) + f'?{self.parameter_constructor(q)}'
 
         response = requests.request('GET', github_url, headers=self.headers)
 
@@ -178,12 +184,12 @@ class GitHub():
 
 
 
-    def get_workflow_runs_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
-        """Fetching run artifacts data from GitHub API for specific reposotory, owner, and run.
+    def get_runs_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+        """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
-            owner (Optional[str], optional): Owner of the reposotory. Defaults to None.
-            repo (Optional[str], optional): Name of the reposotory. Defaults to None.
+            owner (Optional[str], optional): Owner of the repository. Defaults to None.
+            repo (Optional[str], optional): Name of the repository. Defaults to None.
             run_id (int, optional): Run id. Defaults to None.
             save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json".
             verbose (bool): Print extra information to console.
@@ -226,13 +232,13 @@ if __name__ == '__main__':
     # # repo_name = 'fireship' # neither artifacts or workflows
     # repo_name = '225-github-actions-demo' # only workflows
     # cls.get_workflow(owner_name, repo_name)
-    # cls.get_workflow_runs(owner_name, repo_name)
+    # cls.get_runs(owner_name, repo_name)
 
     # org_name = 'fireship-io'
-    # cls.get_orgnization_repostries(org_name)
+    # cls.get_organization_repostries(org_name)
 
     # org_name = 'smartshark'
-    # cls.get_orgnization_repostries(org_name)
+    # cls.get_organization_repostries(org_name)
 
     # get all artifacts for runs
     # with open ('./data/fireship-io_225-github-actions-demo_action_runs.json', 'r', encoding='utf-8') as f:
@@ -242,6 +248,6 @@ if __name__ == '__main__':
     # for run in runs['workflow_runs']:
     #     # print(run['repository']['owner']['login'],run['repository']['name'],type(run['id']) )
     #     count_runs += 1
-    #     cls.get_workflow_runs_artifacts(run['repository']['owner']['login'],run['repository']['name'],run['id'])
+    #     cls.get_runs_artifacts(run['repository']['owner']['login'],run['repository']['name'],run['id'])
     #     # break
     # print('count_runs:', count_runs)
