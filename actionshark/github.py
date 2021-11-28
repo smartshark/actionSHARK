@@ -50,7 +50,7 @@ class GitHub():
 
 
 
-    def save_JSON(self, save_path: str, response: requests.models.Response, verbose: bool = False) -> bool:
+    def save_JSON(self, save_path: str, response: requests.models.Response, checker: Optional[str] = None, verbose: bool = False) -> bool:
         """Saving a JSON response from GitHub API after checking response status.
 
         Args:
@@ -59,10 +59,11 @@ class GitHub():
             verbose (bool): Print extra information to console.
         """
         if response.status_code == 200:
+            if not checker: raise "ERROR: Please define a key in response to check if it has value to save response."
             if verbose: print('Successful Request!')
 
             response_JSON = response.json()
-            if not response_JSON.get('workflow_runs'): return False
+            if not response_JSON.get(checker): return False
 
             with open( save_path, 'w', encoding='utf-8') as f:
                 json.dump(response_JSON, f, indent=4)
@@ -120,7 +121,7 @@ class GitHub():
         if not save_path:
             save_path = f'./data/search/search_{search_type}.json'
 
-        self.save_JSON(save_path, response)
+        self.save_JSON(save_path, response=response, checker='items', verbose=verbose)
 
 
 
@@ -145,7 +146,7 @@ class GitHub():
         if not save_path:
             save_path = f'./data/workflows/{owner}_{repo}_workflows.json'
 
-        self.save_JSON(save_path, response)
+        self.save_JSON(save_path, response=response, checker='workflows', verbose=verbose)
 
 
 
@@ -169,8 +170,8 @@ class GitHub():
 
         if not save_path:
             save_path = f'./data/repos/{organization}_repos.json'
-
-        self.save_JSON(save_path, response)
+        # TODO checker
+        self.save_JSON(save_path, response=response, checker='artifacts', verbose=verbose)
 
 
 
@@ -208,14 +209,14 @@ class GitHub():
                 if not created: save_path = f'./data/runs/{owner}_{repo}_runs_{next_page}.json'
                 else: save_path = f'./data/runs/{owner}_{repo}_runs_{created}_{next_page}.json'
 
-            if not self.save_JSON(save_path, response): break
+            if not self.save_JSON(save_path, response=response, checker='workflow_runs', verbose=verbose): break
 
             github_url = github_url[:-len(f'&page={next_page}')]
 
             if use_sleep: sleep(self.__sleep_time)
 
 
-    def get_runs_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+    def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -237,7 +238,33 @@ class GitHub():
         if not save_path:
             save_path = f'./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
 
-        self.save_JSON(save_path, response, verbose)
+        self.save_JSON(save_path, response=response, checker='artifacts', verbose=verbose)
+
+
+    def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+        """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
+
+        Args:
+            owner (Optional[str], optional): Owner of the repository. Defaults to None.
+            repo (Optional[str], optional): Name of the repository. Defaults to None.
+            run_id (int, optional): Run id. Defaults to None.
+            save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json".
+            verbose (bool): Print extra information to console.
+        """
+
+        if not owner or not repo or not run_id: raise 'Please make to sure to pass both the owner and repo names.'
+
+        url = 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs'
+        github_url = self.__base_url + url.format(owner=owner, repo=repo, run_id=run_id)
+
+        response = requests.request('GET', github_url, headers=self.__headers)
+
+        if verbose: print('GitHub API URL:', github_url)
+
+        if not save_path:
+            save_path = f'./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
+
+        self.save_JSON(save_path, response=response, checker='jobs', verbose=verbose)
 
 if __name__ == '__main__':
 
@@ -279,7 +306,7 @@ if __name__ == '__main__':
     # for run in runs['workflow_runs']:
     #     # print(run['repository']['owner']['login'],run['repository']['name'],type(run['id']) )
     #     count_runs += 1
-    #     cls_GitHub.get_runs_artifacts(run['repository']['owner']['login'],run['repository']['name'],run['id'])
+    #     cls_GitHub.get_run_artifacts(run['repository']['owner']['login'],run['repository']['name'],run['id'])
     #     # break
     # print('count_runs:', count_runs)
 
