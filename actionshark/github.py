@@ -1,5 +1,6 @@
 import json
 from typing import Optional
+from time import sleep
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -27,6 +28,7 @@ class GitHub():
         'users': 'search/users'
     }
 
+    __sleep_time = 2
 
     def __init__(self, file_path: Optional[str] = None) -> None:
         """
@@ -172,7 +174,7 @@ class GitHub():
 
 
 
-    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, created = None, exclude_pull_requests: bool = True, save_path: Optional[str] = None, verbose: bool = False) -> None:
+    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, created = None, exclude_pull_requests: bool = True, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
         """Fetching workflow runs data from GitHub API for specific repository and owner.
 
         Args:
@@ -209,6 +211,8 @@ class GitHub():
             if not self.save_JSON(save_path, response): break
 
             github_url = github_url[:-len(f'&page={next_page}')]
+
+            if use_sleep: sleep(self.__sleep_time)
 
 
     def get_runs_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
