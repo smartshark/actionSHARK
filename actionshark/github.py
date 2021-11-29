@@ -92,20 +92,23 @@ class GitHub():
             verbose (bool): Print extra information to console.
         """
         if response.status_code == 200:
+
             response_JSON = response.json()
 
             if verbose: print('Successful Request!')
+
+            if checker:
+                if not response_JSON.get(checker):
+                    if verbose: print(f'Response is Empty ... Stopping.\n', '-+'*30, sep='')
+                    return False
+            else:
+                if not response_JSON: return False
 
 
             with open( save_path, 'w', encoding='utf-8') as f:
                 json.dump(response_JSON, f, indent=4)
             if verbose: print(f'Response is saved in: {save_path}')
             if verbose: print('_'*(22+len(save_path)))
-
-            if not checker:
-                if not response_JSON: return False
-            else:
-                if not response_JSON.get(checker): return False
 
             return True
 
@@ -309,7 +312,7 @@ if __name__ == '__main__':
 
 
     cls_GitHub = GitHub('settings.json')
-    cls_GitHub.authenticate_user(verbose=True)
+    # cls_GitHub.authenticate_user(verbose=True)
 
     # q = {
     #     'language' : 'python',
@@ -351,9 +354,9 @@ if __name__ == '__main__':
     # print('count_runs:', count_runs)
 
 
-    # owner_name = 'freeCodeCamp'
-    # repo_name = 'freeCodeCamp'
-    # last_stop = 102
-    # cls_GitHub.sleep_time = 10
+    owner_name = 'freeCodeCamp'
+    repo_name = 'freeCodeCamp'
+    last_stop = 251
+    cls_GitHub.sleep_time = 1
     # cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
-    # cls_GitHub.get_runs(owner_name, repo_name, created='2021-11-28')
+    cls_GitHub.get_runs(owner_name, repo_name, created='2021-11-28', use_sleep=True, verbose=True)
