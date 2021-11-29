@@ -1,6 +1,7 @@
 import json
 from typing import Optional
 from time import sleep
+import os
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -19,7 +20,7 @@ class GitHub():
     """
     Managing different type of get Request to fetch data from GitHub REST API"""
 
-    __base_url = 'https://api.github.com/'
+    base_url = 'https://api.github.com/'
 
     __search_dict = {
         'issues' : 'search/issues',
@@ -30,6 +31,8 @@ class GitHub():
 
     __sleep_interval = 2
 
+    __basic_auth_json = None
+
 
     def __init__(self, file_path: Optional[str] = None) -> None:
         """
@@ -38,12 +41,33 @@ class GitHub():
 
         with open(file_path, 'r', encoding='utf-8') as f:
             lines = json.load(f)
-        self.token = lines.get('access_token')
+        self.__token = lines.get('access_token')
         self.__headers = {
             'Accept': 'application/vnd.github.v3+json',
-            'Authentication': f'token {self.token}'
+            'Authorization': f'token {self.__token}'
         }
 
+
+    def authenticate_user(self, token: str = None, verbose: bool = False):
+        if not token: token = self.__token
+        basic_auth = requests.get(self.base_url + 'user', headers=self.__headers)
+
+        if basic_auth.status_code == 200:
+            self.save_JSON('./auth.json', basic_auth, '', verbose)
+
+            self.__basic_auth_json = basic_auth.json()
+
+            if verbose:
+                print(basic_auth.status_code)
+                print(self.__basic_auth_json['name'])
+                print(self.__basic_auth_json['html_url'])
+
+
+            return True
+        else:
+            print(basic_auth.status_code)
+            print(basic_auth.reason)
+            return False
 
     @property
     def sleep_time(self):
@@ -117,7 +141,7 @@ class GitHub():
             verbose (bool): Print extra information to console.
         """
         if search_type in self.__search_dict:
-            url = self.__base_url + self.__search_dict[search_type]
+            url = self.base_url + self.__search_dict[search_type]
         else:
             print('Unrecognized / Unsupported search criteria!')
 
@@ -150,7 +174,7 @@ class GitHub():
         if not owner or not repo: raise 'Please make to sure to pass both the owner and repo names.'
 
         url = 'repos/{owner}/{repo}/actions/workflows'
-        github_url = self.__base_url + url.format(owner=owner, repo=repo)
+        github_url = self.base_url + url.format(owner=owner, repo=repo)
 
         response = requests.request('GET', github_url, headers=self.__headers)
 
@@ -175,7 +199,7 @@ class GitHub():
 
         # url = 'orgs/{org}/actions/permissions/repositories'
         url = 'orgs/{org}/repos?per_page=100'
-        github_url = self.__base_url + url.format(org=organization)
+        github_url = self.base_url + url.format(org=organization)
 
         response = requests.request('GET', github_url, headers=self.__headers)
 
@@ -206,27 +230,27 @@ class GitHub():
         if not created: del q['created']
 
         url = 'repos/{owner}/{repo}/actions/runs'
-        github_url = self.__base_url + url.format(owner=owner, repo=repo) + f'?{self.parameter_constructor(q)}'
+        github_url = self.base_url + url.format(owner=owner, repo=repo) + f'?{self.parameter_constructor(q)}'
 
         if not save_path:
                 if not created: save_path = f'./data/runs/{owner}_{repo}_runs.json'
                 else: save_path = f'./data/runs/{owner}_{repo}_runs_{created}.json'
 
-        next_page = 0
+        page -=1
         while True:
 
-            next_page += page
-            github_url += f'&page={next_page}'
+            page += 1
+            github_url += f'&page={page}'
 
             response = requests.request('GET', github_url, headers=self.__headers)
 
             if verbose: print('GitHub API URL:', github_url)
 
-            iter_save_path = save_path[:-5] + f'_{next_page}.json'
+            iter_save_path = save_path[:-5] + f'_{page}.json'
 
             if not self.save_JSON(save_path=iter_save_path, response=response, checker='workflow_runs', verbose=verbose): break
 
-            github_url = github_url[:-len(f'&page={next_page}')]
+            github_url = github_url[:-len(f'&page={page}')]
 
             if use_sleep: sleep(self.__sleep_interval)
 
@@ -244,7 +268,7 @@ class GitHub():
 
         if not owner or not repo or not run_id: raise 'Please make to sure to pass both the owner and repo names.'
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
-        github_url = self.__base_url + url.format(owner=owner, repo=repo, run_id=run_id)
+        github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id)
 
         response = requests.request('GET', github_url, headers=self.__headers)
 
@@ -270,7 +294,7 @@ class GitHub():
         if not owner or not repo or not run_id: raise 'Please make to sure to pass both the owner and repo names.'
 
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs'
-        github_url = self.__base_url + url.format(owner=owner, repo=repo, run_id=run_id)
+        github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id)
 
         response = requests.request('GET', github_url, headers=self.__headers)
 
@@ -285,6 +309,7 @@ if __name__ == '__main__':
 
 
     cls_GitHub = GitHub('settings.json')
+    cls_GitHub.authenticate_user(verbose=True)
 
     # q = {
     #     'language' : 'python',
@@ -326,8 +351,9 @@ if __name__ == '__main__':
     # print('count_runs:', count_runs)
 
 
-    owner_name = 'freeCodeCamp'
-    repo_name = 'freeCodeCamp'
-    last_stop = 51
-    cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
+    # owner_name = 'freeCodeCamp'
+    # repo_name = 'freeCodeCamp'
+    # last_stop = 102
+    # cls_GitHub.sleep_time = 10
+    # cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
     # cls_GitHub.get_runs(owner_name, repo_name, created='2021-11-28')
