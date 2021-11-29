@@ -69,8 +69,6 @@ class GitHub():
                 print(f'ERROR retriving token, please make sure you set the "file_path" or "env_variable" correctly.')
                 exit()
 
-        print(self.__headers)
-
 
     def authenticate_user(self, token: str = None, verbose: bool = False):
         if not token: token = self.__token
@@ -251,11 +249,14 @@ class GitHub():
         Args:
             owner (Optional[str], optional): Owner of the repository. Defaults to None.
             repo (Optional[str], optional): Name of the repository. Defaults to None.
+            per_page (int, optional): [description]. Defaults to 100.
+            page (int, optional): [description]. Defaults to 1.
+            created ([type], optional): [description]. Defaults to None.
+            exclude_pull_requests (bool, optional): [description]. Defaults to True.
             save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/runs/{owner}_{repo}_runs.json".
+            use_sleep (bool, optional): [description]. Defaults to False.
             verbose (bool): Print extra information to console.
         """
-
-        # https://api.github.com/repos/freeCodeCamp/freeCodeCamp/actions/runs?page=1&per_page=100&sort=created_at&order=desc&created=2021-11-28
 
         if not owner or not repo:
             print('Please make to sure to pass both the owner and repo names.')
@@ -317,7 +318,7 @@ class GitHub():
         self.save_JSON(save_path, response=response, checker='artifacts', verbose=verbose)
 
 
-    def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+    def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -329,20 +330,38 @@ class GitHub():
         """
 
         if not owner or not repo or not run_id:
-            print('Please make to sure to pass both the owner and repo names.')
+            print('Please make to sure to pass the owner, repo name, and run id.')
             exit()
 
-        url = 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs'
-        github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id)
+        url = 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page{per_page}'
+        github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id, per_page=per_page)
 
         response = requests.request('GET', github_url, headers=self.__headers)
 
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
-            save_path = f'./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
+            save_path = f'./data/runs/jobs/{owner}_{repo}_run_{run_id}_artifacts.json'
 
-        self.save_JSON(save_path, response=response, checker='jobs', verbose=verbose)
+        page -=1
+        while True:
+
+            page += 1
+            github_url += f'&page={page}'
+
+            response = requests.request('GET', github_url, headers=self.__headers)
+
+            if verbose: print('GitHub API URL:', github_url)
+
+            iter_save_path = save_path[:-5] + f'_{page}.json'
+
+            if not self.save_JSON(save_path=iter_save_path, response=response, checker='jobs', verbose=verbose): break
+
+            github_url = github_url[:-len(f'&page={page}')]
+
+            if use_sleep: sleep(self.__sleep_interval)
+
+
 
 if __name__ == '__main__':
 
@@ -395,6 +414,10 @@ if __name__ == '__main__':
 
     # owner_name = 'freeCodeCamp'
     # repo_name = 'freeCodeCamp'
+    # run_id = 1514809363
+    # cls_GitHub.get_run_jobs(owner_name, repo_name, run_id)
+
+
     # last_stop = 251
     # cls_GitHub.sleep_time = 1
     # cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
