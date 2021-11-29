@@ -28,7 +28,7 @@ class GitHub():
         'users': 'search/users'
     }
 
-    __sleep_time = 2
+    __sleep_interval = 2
 
     def __init__(self, file_path: Optional[str] = None) -> None:
         """
@@ -43,6 +43,14 @@ class GitHub():
             'Authentication': f'token {self.token}'
         }
 
+
+    @property
+    def sleep_time(self):
+        return self.__sleep_interval
+
+    @sleep_time.setter
+    def sleep_time(self, t):
+        self.__sleep_interval = t
 
     @property
     def search_types(self):
@@ -195,6 +203,10 @@ class GitHub():
         url = 'repos/{owner}/{repo}/actions/runs'
         github_url = self.__base_url + url.format(owner=owner, repo=repo) + f'?{self.parameter_constructor(q)}'
 
+        if not save_path:
+                if not created: save_path = f'./data/runs/{owner}_{repo}_runs.json'
+                else: save_path = f'./data/runs/{owner}_{repo}_runs_{created}.json'
+
         next_page = 0
         while True:
 
@@ -205,15 +217,13 @@ class GitHub():
 
             if verbose: print('GitHub API URL:', github_url)
 
-            if not save_path:
-                if not created: save_path = f'./data/runs/{owner}_{repo}_runs_{next_page}.json'
-                else: save_path = f'./data/runs/{owner}_{repo}_runs_{created}_{next_page}.json'
+            iter_save_path = save_path[:-5] + f'_{next_page}.json'
 
-            if not self.save_JSON(save_path, response=response, checker='workflow_runs', verbose=verbose): break
+            if not self.save_JSON(save_path=iter_save_path, response=response, checker='workflow_runs', verbose=verbose): break
 
             github_url = github_url[:-len(f'&page={next_page}')]
 
-            if use_sleep: sleep(self.__sleep_time)
+            if use_sleep: sleep(self.__sleep_interval)
 
 
     def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
@@ -313,5 +323,6 @@ if __name__ == '__main__':
 
     owner_name = 'freeCodeCamp'
     repo_name = 'freeCodeCamp'
-    cls_GitHub.get_runs(owner_name, repo_name, verbose=True)
+    last_stop = 51
+    cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
     # cls_GitHub.get_runs(owner_name, repo_name, created='2021-11-28')
