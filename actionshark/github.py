@@ -29,27 +29,53 @@ class GitHub():
         'users': 'search/users'
     }
 
-    __sleep_interval = 2
+    __sleep_interval = 1
 
     __basic_auth_json = None
 
 
-    def __init__(self, file_path: Optional[str] = None) -> None:
+    def __init__(self, file_path: Optional[str] = None, env_variable: Optional[str] = None, with_token: bool = True) -> None:
         """
         Extract Token from settings file for Authentication"""
-        if not file_path: raise f'ERROR: Add the path to JSON file with Access Token'
 
-        with open(file_path, 'r', encoding='utf-8') as f:
-            lines = json.load(f)
-        self.__token = lines.get('access_token')
-        self.__headers = {
-            'Accept': 'application/vnd.github.v3+json',
-            'Authorization': f'token {self.__token}'
-        }
+        self.__headers = {'Accept': 'application/vnd.github.v3+json'}
+
+
+        if with_token:
+            if not file_path and not env_variable:
+                print(f'ERROR: Add the path to JSON file with Access Token')
+                exit()
+
+            if file_path:
+                if not file_path.split('.')[-1] == 'json':
+                    print('Please pass a "json" file path or add file extention in case the file is "json".')
+                    exit()
+
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    lines = json.load(f)
+                self.__token = lines.get('access_token')
+
+                if not self.__token:
+                    print('Please set the token key to "access_token".')
+                    exit()
+
+            elif env_variable:
+                self.__token = os.environ.get(env_variable)
+            else: self.__token = None
+
+            if self.__token:
+                self.__headers['Authorization'] = f'token {self.__token}'
+            else:
+                print(f'ERROR retriving token, please make sure you set the "file_path" or "env_variable" correctly.')
+                exit()
+
+        print(self.__headers)
 
 
     def authenticate_user(self, token: str = None, verbose: bool = False):
         if not token: token = self.__token
+        else: self.__token = token
+
         basic_auth = requests.get(self.base_url + 'user', headers=self.__headers)
 
         if basic_auth.status_code == 200:
@@ -174,7 +200,9 @@ class GitHub():
             save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/workflows/{owner}_{repo}_workflows.json".
             verbose (bool): Print extra information to console.
         """
-        if not owner or not repo: raise 'Please make to sure to pass both the owner and repo names.'
+        if not owner or not repo:
+            print('Please make to sure to pass both the owner and repo names.')
+            exit()
 
         url = 'repos/{owner}/{repo}/actions/workflows'
         github_url = self.base_url + url.format(owner=owner, repo=repo)
@@ -198,7 +226,9 @@ class GitHub():
             save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/repos/{organization}_repos.json".
             verbose (bool): Print extra information to console.
         """
-        if not organization : raise 'Please pass the organization name.'
+        if not organization :
+            print('Please pass the organization name.')
+            exit()
 
         # url = 'orgs/{org}/actions/permissions/repositories'
         url = 'orgs/{org}/repos?per_page=100'
@@ -227,7 +257,9 @@ class GitHub():
 
         # https://api.github.com/repos/freeCodeCamp/freeCodeCamp/actions/runs?page=1&per_page=100&sort=created_at&order=desc&created=2021-11-28
 
-        if not owner or not repo: raise 'Please make to sure to pass both the owner and repo names.'
+        if not owner or not repo:
+            print('Please make to sure to pass both the owner and repo names.')
+            exit()
 
         q = {'per_page': str(per_page), 'created': created, 'exclude_pull_requests': str(exclude_pull_requests) }
         if not created: del q['created']
@@ -269,7 +301,9 @@ class GitHub():
             verbose (bool): Print extra information to console.
         """
 
-        if not owner or not repo or not run_id: raise 'Please make to sure to pass both the owner and repo names.'
+        if not owner or not repo or not run_id:
+            print('Please make to sure to pass both the owner and repo names.')
+            exit()
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id)
 
@@ -294,7 +328,9 @@ class GitHub():
             verbose (bool): Print extra information to console.
         """
 
-        if not owner or not repo or not run_id: raise 'Please make to sure to pass both the owner and repo names.'
+        if not owner or not repo or not run_id:
+            print('Please make to sure to pass both the owner and repo names.')
+            exit()
 
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id)
@@ -311,7 +347,10 @@ class GitHub():
 if __name__ == '__main__':
 
 
-    cls_GitHub = GitHub('settings.json')
+    cls_GitHub = GitHub(file_path = 'settings.json')
+    # cls_GitHub = GitHub(env_variable = 'GITHUB_Token')
+
+
     # cls_GitHub.authenticate_user(verbose=True)
 
     # q = {
@@ -354,9 +393,9 @@ if __name__ == '__main__':
     # print('count_runs:', count_runs)
 
 
-    owner_name = 'freeCodeCamp'
-    repo_name = 'freeCodeCamp'
-    last_stop = 251
-    cls_GitHub.sleep_time = 1
+    # owner_name = 'freeCodeCamp'
+    # repo_name = 'freeCodeCamp'
+    # last_stop = 251
+    # cls_GitHub.sleep_time = 1
     # cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
-    cls_GitHub.get_runs(owner_name, repo_name, created='2021-11-28', use_sleep=True, verbose=True)
+    # cls_GitHub.get_runs(owner_name, repo_name, created='2021-11-28', use_sleep=True, verbose=True)
