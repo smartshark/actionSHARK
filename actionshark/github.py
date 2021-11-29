@@ -9,11 +9,9 @@ from requests.auth import HTTPBasicAuth
 
 '''
 Notes:
-API requests using Basic Authentication or OAuth, you can make up to 5,000 requests per hour
-checking limit: https://api.github.com/users/hatahetahmad
+API requests using Basic Authentication or OAuth, you can make up to 5,000 requests per hour.
 Secondary rate limits are not intended to interfere with legitimate use of the API.
 Your normal rate limits should be the only limit you target.
-
 '''
 
 class GitHub():
@@ -70,6 +68,7 @@ class GitHub():
                 exit()
 
 
+
     def authenticate_user(self, token: str = None, verbose: bool = False):
         if not token: token = self.__token
         else: self.__token = token
@@ -93,13 +92,24 @@ class GitHub():
             print(basic_auth.reason)
             return False
 
+
+
     @property
     def sleep_time(self):
         return self.__sleep_interval
 
+
+
     @sleep_time.setter
     def sleep_time(self, t):
         self.__sleep_interval = t
+
+
+    @sleep_time.deleter
+    def sleep_time(self):
+        self.__sleep_interval = 0
+
+
 
     @property
     def search_types(self):
