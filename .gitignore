@@ -1,6 +1,6 @@
 actionshark/data
+actionshark/*.json
 notes.md
-*.json
 *.csv
 *.pickel
 
