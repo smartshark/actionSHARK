@@ -30,6 +30,7 @@ class GitHub():
 
     __sleep_interval = 2
 
+
     def __init__(self, file_path: Optional[str] = None) -> None:
         """
         Extract Token from settings file for Authentication"""
@@ -67,23 +68,27 @@ class GitHub():
             verbose (bool): Print extra information to console.
         """
         if response.status_code == 200:
-            if not checker: raise "ERROR: Please define a key in response to check if it has value to save response."
+            response_JSON = response.json()
+
             if verbose: print('Successful Request!')
 
-            response_JSON = response.json()
-            if not response_JSON.get(checker): return False
 
             with open( save_path, 'w', encoding='utf-8') as f:
                 json.dump(response_JSON, f, indent=4)
             if verbose: print(f'Response is saved in: {save_path}')
-            if verbose: print('-'*60)
+            if verbose: print('_'*(22+len(save_path)))
+
+            if not checker:
+                if not response_JSON: return False
+            else:
+                if not response_JSON.get(checker): return False
 
             return True
 
         else:
             print(f'ERROR: {response.status_code}')
             if verbose: print(f'ERROR: {response.reason}')
-            print('-'*60)
+            print('-'*len(response.reason))
 
             return False
 
@@ -169,7 +174,7 @@ class GitHub():
         if not organization : raise 'Please pass the organization name.'
 
         # url = 'orgs/{org}/actions/permissions/repositories'
-        url = 'orgs/{org}/repos'
+        url = 'orgs/{org}/repos?per_page=100'
         github_url = self.__base_url + url.format(org=organization)
 
         response = requests.request('GET', github_url, headers=self.__headers)
@@ -178,8 +183,8 @@ class GitHub():
 
         if not save_path:
             save_path = f'./data/repos/{organization}_repos.json'
-        # TODO checker
-        self.save_JSON(save_path, response=response, checker='artifacts', verbose=verbose)
+
+        self.save_JSON(save_path, response=response, checker=None, verbose=verbose)
 
 
 
