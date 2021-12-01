@@ -4,7 +4,6 @@ from time import sleep
 import os
 
 import requests
-from requests.auth import HTTPBasicAuth
 
 
 '''
@@ -69,7 +68,7 @@ class GitHub():
 
 
 
-    def authenticate_user(self, token: str = None, verbose: bool = False):
+    def authenticate_user(self, token: Optional[str] = None, verbose: bool = False):
         if not token: token = self.__token
         else: self.__token = token
 
@@ -117,7 +116,7 @@ class GitHub():
 
 
 
-    def save_JSON(self, save_path: str, response: requests.models.Response, checker: Optional[str] = None, verbose: bool = False) -> bool:
+    def save_JSON(self, response: requests.models.Response, save_path: Optional[str] = None, checker: Optional[str] = None, verbose: bool = False) -> bool:
         """Saving a JSON response from GitHub API after checking response status.
 
         Args:
@@ -168,7 +167,7 @@ class GitHub():
 
 
 
-    def get_search(self, search_type: str, q: dict = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+    def get_search(self, search_type: Optional[str] = None, q: Optional[dict] = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
         """Fetching search data from GitHub API for types like issues, user, ... etc.
 
         Args:
@@ -180,7 +179,7 @@ class GitHub():
         if search_type in self.__search_dict:
             url = self.base_url + self.__search_dict[search_type]
         else:
-            print('Unrecognized / Unsupported search criteria!')
+            print('Unrecognized or Unsupported search criteria!')
 
         if q != None:
             q = self.parameter_constructor(q)
@@ -253,7 +252,7 @@ class GitHub():
 
 
 
-    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, created = None, exclude_pull_requests: bool = True, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
+    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, created: Optional[str] = None, exclude_pull_requests: bool = True, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
         """Fetching workflow runs data from GitHub API for specific repository and owner.
 
         Args:
@@ -301,7 +300,7 @@ class GitHub():
             if use_sleep: sleep(self.__sleep_interval)
 
 
-    def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
+    def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -346,7 +345,7 @@ class GitHub():
             if use_sleep: sleep(self.__sleep_interval)
 
 
-    def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
+    def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
