@@ -301,7 +301,7 @@ class GitHub():
             if use_sleep: sleep(self.__sleep_interval)
 
 
-    def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+    def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -315,8 +315,9 @@ class GitHub():
         if not owner or not repo or not run_id:
             print('Please make to sure to pass both the owner and repo names.')
             exit()
-        url = 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts'
-        github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id)
+
+        url = 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page{per_page}'
+        github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id, per_page=per_page)
 
         response = requests.request('GET', github_url, headers=self.__headers)
 
@@ -325,7 +326,24 @@ class GitHub():
         if not save_path:
             save_path = f'./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
 
-        self.save_JSON(save_path, response=response, checker='artifacts', verbose=verbose)
+
+        page -=1
+        while True:
+
+            page += 1
+            github_url += f'&page={page}'
+
+            response = requests.request('GET', github_url, headers=self.__headers)
+
+            if verbose: print('GitHub API URL:', github_url)
+
+            iter_save_path = save_path[:-5] + f'_{page}.json'
+
+            if not self.save_JSON(save_path=iter_save_path, response=response, checker='artifacts', verbose=verbose): break
+
+            github_url = github_url[:-len(f'&page={page}')]
+
+            if use_sleep: sleep(self.__sleep_interval)
 
 
     def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: int = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
@@ -351,7 +369,7 @@ class GitHub():
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
-            save_path = f'./data/runs/jobs/{owner}_{repo}_run_{run_id}_artifacts.json'
+            save_path = f'./data/runs/jobs/{owner}_{repo}_run_{run_id}_jobs.json'
 
         page -=1
         while True:
@@ -377,9 +395,11 @@ if __name__ == '__main__':
 
     cls_GitHub = GitHub(env_variable = 'GITHUB_Token')
 
-
+    # test authorization using only token
     # cls_GitHub.authenticate_user(verbose=True)
 
+
+    # test search issues with parameters
     # q = {
     #     'language' : 'python',
     #     'star' : '>50',
@@ -388,44 +408,34 @@ if __name__ == '__main__':
     # cls_GitHub.get_search('issues', q)
 
 
-    # Get all organization
+    # test search for organization
     # q = {'type':'org'}
     # cls_GitHub.get_search('users', q)
 
-    # owner_name = 'smartshark'
-    # repo_name = 'issueSHARK'
-
+    # test get organization repositories
     # owner_name = 'fireship-io'
-    # # repo_name = 'fireship' # neither artifacts or workflows
-    # repo_name = '225-github-actions-demo' # only workflows
-    # cls_GitHub.get_workflow(owner_name, repo_name)
-    # cls_GitHub.get_runs(owner_name, repo_name)
-
-    # org_name = 'fireship-io'
+    # repo_name = 'fireship'
     # cls_GitHub.get_organization_repostries(org_name)
 
     # org_name = 'smartshark'
     # cls_GitHub.get_organization_repostries(org_name)
 
-    # get all artifacts for runs
-    # with open ('./data/fireship-io_225-github-actions-demo_action_runs.json', 'r', encoding='utf-8') as f:
-    #     runs = json.load(f)
-
-    # count_runs = 0
-    # for run in runs['workflow_runs']:
-    #     # print(run['repository']['owner']['login'],run['repository']['name'],type(run['id']) )
-    #     count_runs += 1
-    #     cls_GitHub.get_run_artifacts(run['repository']['owner']['login'],run['repository']['name'],run['id'])
-    #     # break
-    # print('count_runs:', count_runs)
 
 
+    # test jobs with paginating
     # owner_name = 'freeCodeCamp'
     # repo_name = 'freeCodeCamp'
     # run_id = 1514809363
     # cls_GitHub.get_run_jobs(owner_name, repo_name, run_id)
 
 
+    # test artifacts with paginating
+    # owner_name = 'freeCodeCamp'
+    # repo_name = 'freeCodeCamp'
+    # run_id = 1511226364
+    # cls_GitHub.get_run_artifacts(owner_name, repo_name, run_id)
+
+    # test runs with paginating and created parameter
     # last_stop = 251
     # cls_GitHub.sleep_time = 1
     # cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
