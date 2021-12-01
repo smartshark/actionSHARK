@@ -375,9 +375,7 @@ class GitHub():
 
 if __name__ == '__main__':
 
-
-    cls_GitHub = GitHub(file_path = 'settings.json')
-    # cls_GitHub = GitHub(env_variable = 'GITHUB_Token')
+    cls_GitHub = GitHub(env_variable = 'GITHUB_Token')
 
 
     # cls_GitHub.authenticate_user(verbose=True)
