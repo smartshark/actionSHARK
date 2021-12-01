@@ -1,5 +1,7 @@
 actionshark/data
 actionshark/*.json
+tests
+*.pptx
 notes.md
 *.csv
 *.pickel
