@@ -5,6 +5,8 @@ tests
 notes.md
 *.csv
 *.pickel
+.*
+!/.gitignore
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
