@@ -2,6 +2,7 @@ import json
 from typing import Optional
 from time import sleep
 import os
+import sys
 
 import requests
 
@@ -41,12 +42,12 @@ class GitHub():
         if with_token:
             if not file_path and not env_variable:
                 print(f'ERROR: Add the path to JSON file with Access Token')
-                exit()
+                sys.exit(1)
 
             if file_path:
                 if not file_path.split('.')[-1] == 'json':
                     print('Please pass a "json" file path or add file extention in case the file is "json".')
-                    exit()
+                    sys.exit(1)
 
                 with open(file_path, 'r', encoding='utf-8') as f:
                     lines = json.load(f)
@@ -54,7 +55,7 @@ class GitHub():
 
                 if not self.__token:
                     print('Please set the token key to "access_token".')
-                    exit()
+                    sys.exit(1)
 
             elif env_variable:
                 self.__token = os.environ.get(env_variable)
@@ -64,7 +65,7 @@ class GitHub():
                 self.__headers['Authorization'] = f'token {self.__token}'
             else:
                 print(f'ERROR retriving token, please make sure you set the "file_path" or "env_variable" correctly.')
-                exit()
+                sys.exit(1)
 
 
 
@@ -224,7 +225,7 @@ class GitHub():
         """
         if not owner :
             print('Please pass the owner name.')
-            exit()
+            sys.exit(1)
 
         # url = 'orgs/{org}/actions/permissions/repositories'
         url = 'orgs/{org}/repos?per_page={per_page}'
@@ -250,7 +251,7 @@ class GitHub():
         """
         if not owner or not repo:
             print('Please make to sure to pass both the owner and repo names.')
-            exit()
+            sys.exit(1)
 
         url = 'repos/{owner}/{repo}/actions/workflows?per_page={per_page}'
 
@@ -282,7 +283,7 @@ class GitHub():
 
         if not owner or not repo:
             print('Please make to sure to pass both the owner and repo names.')
-            exit()
+            sys.exit(1)
 
         q = {'per_page': str(per_page), 'exclude_pull_requests': str(exclude_pull_requests) }
 
@@ -311,7 +312,7 @@ class GitHub():
 
         if not owner or not repo or not run_id:
             print('Please make to sure to pass both the owner and repo names.')
-            exit()
+            sys.exit(1)
 
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page{per_page}'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id, per_page=per_page)
@@ -338,7 +339,7 @@ class GitHub():
 
         if not owner or not repo or not run_id:
             print('Please make to sure to pass the owner, repo name, and run id.')
-            exit()
+            sys.exit(1)
 
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page{per_page}'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id, per_page=per_page)
