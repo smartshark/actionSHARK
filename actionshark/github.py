@@ -26,7 +26,7 @@ class GitHub():
         'users': 'search/users'
     }
 
-    __sleep_interval = 1
+    __sleep_interval = 2
 
     __basic_auth_json = None
 
@@ -214,7 +214,34 @@ class GitHub():
 
 
 
-    def get_workflow(self, owner: Optional[str] = None, repo: Optional[str] = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+    def get_owner_repostries(self, owner: Optional[str] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
+        """Fetching repositories data from GitHub API for specific owner.
+
+        Args:
+            owner (Optional[str], optional): owner name. Defaults to None.
+            save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/repos/{owner}_repos.json".
+            verbose (bool): Print extra information to console.
+        """
+        if not owner :
+            print('Please pass the owner name.')
+            exit()
+
+        # url = 'orgs/{org}/actions/permissions/repositories'
+        url = 'orgs/{org}/repos?per_page={per_page}'
+        github_url = self.base_url + url.format(org=owner, per_page=per_page)
+
+        response = requests.request('GET', github_url, headers=self.__headers)
+
+        if verbose: print('GitHub API URL:', github_url)
+
+        if not save_path:
+            save_path = f'./data/repositories/{owner}_repos.json'
+
+        self.paginating(github_url, page, None, save_path, use_sleep, verbose)
+
+
+
+    def get_workflow(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
         """Fetching workflows data from GitHub API for specific repository and owner.
 
         Args:
@@ -227,9 +254,9 @@ class GitHub():
             print('Please make to sure to pass both the owner and repo names.')
             exit()
 
-        url = 'repos/{owner}/{repo}/actions/workflows?per_page=100&page=1'
+        url = 'repos/{owner}/{repo}/actions/workflows?per_page={per_page}'
 
-        github_url = self.base_url + url.format(owner=owner, repo=repo)
+        github_url = self.base_url + url.format(owner=owner, repo=repo, per_page=per_page)
 
         response = requests.request('GET', github_url, headers=self.__headers)
 
@@ -238,38 +265,12 @@ class GitHub():
         if not save_path:
             save_path = f'./data/workflows/{owner}_{repo}_workflows.json'
 
-        self.save_JSON(response=response, save_path=save_path, checker='workflows', verbose=verbose)
+
+        self.paginating(github_url, page, 'workflows', save_path, use_sleep, verbose)
 
 
 
-    def get_organization_repostries(self, organization: Optional[str] = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
-        """Fetching repositories data from GitHub API for specific organization.
-
-        Args:
-            organization (Optional[str], optional): Organization name. Defaults to None.
-            save_path (Optional[str], optional): File name and path to where the response should be saved. Defaults to "./data/repos/{organization}_repos.json".
-            verbose (bool): Print extra information to console.
-        """
-        if not organization :
-            print('Please pass the organization name.')
-            exit()
-
-        # url = 'orgs/{org}/actions/permissions/repositories'
-        url = 'orgs/{org}/repos?per_page=100'
-        github_url = self.base_url + url.format(org=organization)
-
-        response = requests.request('GET', github_url, headers=self.__headers)
-
-        if verbose: print('GitHub API URL:', github_url)
-
-        if not save_path:
-            save_path = f'./data/repositories/{organization}_repos.json'
-
-        self.save_JSON(response=response, save_path=save_path, checker=None, verbose=verbose)
-
-
-
-    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, exclude_pull_requests: bool = True, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
+    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, exclude_pull_requests: bool = True, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
         """Fetching workflow runs data from GitHub API for specific repository and owner.
 
         Args:
@@ -317,7 +318,7 @@ class GitHub():
 
 
 
-    def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
+    def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -364,7 +365,7 @@ class GitHub():
 
 
 
-    def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
+    def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -410,6 +411,28 @@ class GitHub():
 
 
 
+    def paginating(self, github_url: Optional[str] = None, page: int = 1, checker: Optional[str] = None, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False):
+
+        while True:
+
+            github_url += f'&page={page}'
+
+            response = requests.request('GET', github_url, headers=self.__headers)
+
+            if verbose: print('GitHub API URL:', github_url)
+
+            iter_save_path = save_path[:-5] + f'_{page}.json'
+
+            if not self.save_JSON(response, iter_save_path, checker, verbose): break
+
+            github_url = github_url[:-len(f'&page={page}')]
+
+            page += 1
+
+            if use_sleep: sleep(self.__sleep_interval)
+
+
+
 if __name__ == '__main__':
 
     cls_GitHub = GitHub(env_variable = 'GITHUB_Token')
@@ -427,17 +450,17 @@ if __name__ == '__main__':
     # cls_GitHub.get_search('issues', q)
 
 
-    # test search for organization
+    # test search for owner
     # q = {'type':'org'}
     # cls_GitHub.get_search('users', q)
 
-    # test get organization repositories
+    # test get owner repositories
     # owner_name = 'fireship-io'
     # repo_name = 'fireship'
-    # cls_GitHub.get_organization_repostries(org_name)
+    # cls_GitHub.get_owner_repostries(org_name)
 
     # org_name = 'smartshark'
-    # cls_GitHub.get_organization_repostries(org_name)
+    # cls_GitHub.get_owner_repostries(org_name)
 
 
 
@@ -463,5 +486,5 @@ if __name__ == '__main__':
 
     owner_name = 'apache'
     repo_name = 'commons-lang'
-    cls_GitHub.get_organization_repostries(owner_name)
-    cls_GitHub.get_workflow(owner_name, repo_name, verbose=True)
+    cls_GitHub.get_owner_repostries(owner_name, verbose=True)
+    # cls_GitHub.get_workflow(owner_name, repo_name, verbose=True)
