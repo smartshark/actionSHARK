@@ -183,7 +183,7 @@ class GitHub():
 
 
 
-    def get_search(self, search_type: Optional[str] = None, q: Optional[dict] = None, save_path: Optional[str] = None, verbose: bool = False) -> None:
+    def get_search(self, search_type: Optional[str] = None, q: Optional[dict] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
         """Fetching search data from GitHub API for types like issues, user, ... etc.
 
         Args:
@@ -203,14 +203,14 @@ class GitHub():
         else:
             github_url = url
 
-        response = requests.request('GET', github_url, headers=self.__headers)
+        github_url += '&per_page=' + str(per_page)
 
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/search/search_{search_type}.json'
 
-        self.save_JSON(save_path, response=response, checker='items', verbose=verbose)
+        self.paginating(github_url, page, 'items', save_path, use_sleep, verbose)
 
 
 
@@ -229,8 +229,6 @@ class GitHub():
         # url = 'orgs/{org}/actions/permissions/repositories'
         url = 'orgs/{org}/repos?per_page={per_page}'
         github_url = self.base_url + url.format(org=owner, per_page=per_page)
-
-        response = requests.request('GET', github_url, headers=self.__headers)
 
         if verbose: print('GitHub API URL:', github_url)
 
@@ -258,13 +256,10 @@ class GitHub():
 
         github_url = self.base_url + url.format(owner=owner, repo=repo, per_page=per_page)
 
-        response = requests.request('GET', github_url, headers=self.__headers)
-
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/workflows/{owner}_{repo}_workflows.json'
-
 
         self.paginating(github_url, page, 'workflows', save_path, use_sleep, verbose)
 
@@ -294,27 +289,12 @@ class GitHub():
         url = 'repos/{owner}/{repo}/actions/runs'
         github_url = self.base_url + url.format(owner=owner, repo=repo) + f'?{self.parameter_constructor(q)}'
 
+        if verbose: print('GitHub API URL:', github_url)
+
         if not save_path:
             save_path = f'./data/runs/{owner}_{repo}_runs.json'
 
-
-        while True:
-
-            github_url += f'&page={page}'
-
-            response = requests.request('GET', github_url, headers=self.__headers)
-
-            if verbose: print('GitHub API URL:', github_url)
-
-            iter_save_path = save_path[:-5] + f'_{page}.json'
-
-            if not self.save_JSON(response=response, save_path=iter_save_path, checker='workflow_runs', verbose=verbose): break
-
-            github_url = github_url[:-len(f'&page={page}')]
-
-            page += 1
-
-            if use_sleep: sleep(self.__sleep_interval)
+        self.paginating(github_url, page, 'workflow_runs', save_path, use_sleep, verbose)
 
 
 
@@ -336,32 +316,12 @@ class GitHub():
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page{per_page}'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id, per_page=per_page)
 
-        response = requests.request('GET', github_url, headers=self.__headers)
-
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
 
-
-
-        while True:
-
-            github_url += f'&page={page}'
-
-            response = requests.request('GET', github_url, headers=self.__headers)
-
-            if verbose: print('GitHub API URL:', github_url)
-
-            iter_save_path = save_path[:-5] + f'_{page}.json'
-
-            if not self.save_JSON(response=response, save_path=iter_save_path, checker='artifacts', verbose=verbose): break
-
-            github_url = github_url[:-len(f'&page={page}')]
-
-            page += 1
-
-            if use_sleep: sleep(self.__sleep_interval)
+        self.paginating(github_url, page, 'artifacts', save_path, use_sleep, verbose)
 
 
 
@@ -383,31 +343,12 @@ class GitHub():
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page{per_page}'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id, per_page=per_page)
 
-        response = requests.request('GET', github_url, headers=self.__headers)
-
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/jobs/{owner}_{repo}_run_{run_id}_jobs.json'
 
-
-        while True:
-
-            github_url += f'&page={page}'
-
-            response = requests.request('GET', github_url, headers=self.__headers)
-
-            if verbose: print('GitHub API URL:', github_url)
-
-            iter_save_path = save_path[:-5] + f'_{page}.json'
-
-            if not self.save_JSON(response=response, save_path=iter_save_path, checker='jobs', verbose=verbose): break
-
-            github_url = github_url[:-len(f'&page={page}')]
-
-            page += 1
-
-            if use_sleep: sleep(self.__sleep_interval)
+        self.paginating(github_url, page, 'jobs', save_path, use_sleep, verbose)
 
 
 
@@ -487,4 +428,9 @@ if __name__ == '__main__':
     owner_name = 'apache'
     repo_name = 'commons-lang'
     cls_GitHub.get_owner_repostries(owner_name, verbose=True)
-    # cls_GitHub.get_workflow(owner_name, repo_name, verbose=True)
+    cls_GitHub.get_workflow(owner_name, repo_name, verbose=True)
+    cls_GitHub.get_runs(owner_name, repo_name, verbose=True)
+
+    # TODO function to loop over run ids
+    # cls_GitHub.get_run_jobs(owner_name, repo_name, verbose=True)
+    # cls_GitHub.get_run_artifacts(owner_name, repo_name, verbose=True)
