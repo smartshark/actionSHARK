@@ -31,10 +31,10 @@ class GitHub():
     __basic_auth_json = None
 
 
-    def __init__(self, file_path: Optional[str] = None, env_variable: Optional[str] = None, with_token: bool = True) -> None:
+    def __init__(self, file_path: Optional[str] = None, env_variable: Optional[str] = None, with_token: bool = True, create_folders: bool = True) -> None:
         """
         Extract Token from settings file for Authentication"""
-
+        if create_folders: self.create_folders()
         self.__headers = {'Accept': 'application/vnd.github.v3+json'}
 
 
@@ -92,6 +92,22 @@ class GitHub():
             return False
 
 
+
+    def create_folders(self):
+        # main data
+        if not os.path.exists('data'): os.mkdir('data')
+        # search
+        if not os.path.exists('data/search'): os.mkdir('data/search')
+        # repositories
+        if not os.path.exists('data/repositories'): os.mkdir('data/repositories')
+        # workflows
+        if not os.path.exists('data/workflows'): os.mkdir('data/workflows')
+        # runs
+        if not os.path.exists('data/runs'): os.mkdir('data/runs')
+        # jobs
+        if not os.path.exists('data/jobs'): os.mkdir('data/jobs')
+        # artifacts
+        if not os.path.exists('data/artifacts'): os.mkdir('data/artifacts')
 
     @property
     def sleep_time(self):
@@ -211,7 +227,8 @@ class GitHub():
             print('Please make to sure to pass both the owner and repo names.')
             exit()
 
-        url = 'repos/{owner}/{repo}/actions/workflows'
+        url = 'repos/{owner}/{repo}/actions/workflows?per_page=100&page=1'
+
         github_url = self.base_url + url.format(owner=owner, repo=repo)
 
         response = requests.request('GET', github_url, headers=self.__headers)
@@ -221,7 +238,7 @@ class GitHub():
         if not save_path:
             save_path = f'./data/workflows/{owner}_{repo}_workflows.json'
 
-        self.save_JSON(save_path, response=response, checker='workflows', verbose=verbose)
+        self.save_JSON(response=response, save_path=save_path, checker='workflows', verbose=verbose)
 
 
 
@@ -246,13 +263,13 @@ class GitHub():
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
-            save_path = f'./data/repos/{organization}_repos.json'
+            save_path = f'./data/repositories/{organization}_repos.json'
 
-        self.save_JSON(save_path, response=response, checker=None, verbose=verbose)
+        self.save_JSON(response=response, save_path=save_path, checker=None, verbose=verbose)
 
 
 
-    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, created: Optional[str] = None, exclude_pull_requests: bool = True, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
+    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, exclude_pull_requests: bool = True, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
         """Fetching workflow runs data from GitHub API for specific repository and owner.
 
         Args:
@@ -271,20 +288,17 @@ class GitHub():
             print('Please make to sure to pass both the owner and repo names.')
             exit()
 
-        q = {'per_page': str(per_page), 'created': created, 'exclude_pull_requests': str(exclude_pull_requests) }
-        if not created: del q['created']
+        q = {'per_page': str(per_page), 'exclude_pull_requests': str(exclude_pull_requests) }
 
         url = 'repos/{owner}/{repo}/actions/runs'
         github_url = self.base_url + url.format(owner=owner, repo=repo) + f'?{self.parameter_constructor(q)}'
 
         if not save_path:
-                if not created: save_path = f'./data/runs/{owner}_{repo}_runs.json'
-                else: save_path = f'./data/runs/{owner}_{repo}_runs_{created}.json'
+            save_path = f'./data/runs/{owner}_{repo}_runs.json'
 
-        page -=1
+
         while True:
 
-            page += 1
             github_url += f'&page={page}'
 
             response = requests.request('GET', github_url, headers=self.__headers)
@@ -293,11 +307,14 @@ class GitHub():
 
             iter_save_path = save_path[:-5] + f'_{page}.json'
 
-            if not self.save_JSON(save_path=iter_save_path, response=response, checker='workflow_runs', verbose=verbose): break
+            if not self.save_JSON(response=response, save_path=iter_save_path, checker='workflow_runs', verbose=verbose): break
 
             github_url = github_url[:-len(f'&page={page}')]
 
+            page += 1
+
             if use_sleep: sleep(self.__sleep_interval)
+
 
 
     def get_run_artifacts(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
@@ -323,13 +340,12 @@ class GitHub():
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
-            save_path = f'./data/runs/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
+            save_path = f'./data/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
 
 
-        page -=1
+
         while True:
 
-            page += 1
             github_url += f'&page={page}'
 
             response = requests.request('GET', github_url, headers=self.__headers)
@@ -338,11 +354,14 @@ class GitHub():
 
             iter_save_path = save_path[:-5] + f'_{page}.json'
 
-            if not self.save_JSON(save_path=iter_save_path, response=response, checker='artifacts', verbose=verbose): break
+            if not self.save_JSON(response=response, save_path=iter_save_path, checker='artifacts', verbose=verbose): break
 
             github_url = github_url[:-len(f'&page={page}')]
 
+            page += 1
+
             if use_sleep: sleep(self.__sleep_interval)
+
 
 
     def get_run_jobs(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = False, verbose: bool = False) -> None:
@@ -368,12 +387,11 @@ class GitHub():
         if verbose: print('GitHub API URL:', github_url)
 
         if not save_path:
-            save_path = f'./data/runs/jobs/{owner}_{repo}_run_{run_id}_jobs.json'
+            save_path = f'./data/jobs/{owner}_{repo}_run_{run_id}_jobs.json'
 
-        page -=1
+
         while True:
 
-            page += 1
             github_url += f'&page={page}'
 
             response = requests.request('GET', github_url, headers=self.__headers)
@@ -382,9 +400,11 @@ class GitHub():
 
             iter_save_path = save_path[:-5] + f'_{page}.json'
 
-            if not self.save_JSON(save_path=iter_save_path, response=response, checker='jobs', verbose=verbose): break
+            if not self.save_JSON(response=response, save_path=iter_save_path, checker='jobs', verbose=verbose): break
 
             github_url = github_url[:-len(f'&page={page}')]
+
+            page += 1
 
             if use_sleep: sleep(self.__sleep_interval)
 
@@ -439,3 +459,9 @@ if __name__ == '__main__':
     # cls_GitHub.sleep_time = 1
     # cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
     # cls_GitHub.get_runs(owner_name, repo_name, created='2021-11-28', use_sleep=True, verbose=True)
+
+
+    owner_name = 'apache'
+    repo_name = 'commons-lang'
+    cls_GitHub.get_organization_repostries(owner_name)
+    cls_GitHub.get_workflow(owner_name, repo_name, verbose=True)
