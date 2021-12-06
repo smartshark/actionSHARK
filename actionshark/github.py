@@ -150,7 +150,7 @@ class GitHub():
 
         response = requests.get(url, headers=header)
         self.total_requests += 1
-        if verbose: print('Total Requests:', self.total_requests)
+        if verbose: print('+ Total Requests:', self.total_requests)
 
         return response
 
@@ -181,7 +181,7 @@ class GitHub():
             with open( save_path, 'w', encoding='utf-8') as f:
                 json.dump(response_JSON, f, indent=4)
             if verbose: print(f'Response is saved in: {save_path}')
-            if verbose: print('_'*(22+len(save_path)))
+            if verbose: print('_'*(25+len(save_path)))
 
             return True
 
@@ -202,7 +202,7 @@ class GitHub():
             # self.save_JSON(basic_auth, './auth.json', '', verbose)
             basic_auth_json = basic_auth.json()
             if verbose:
-                print(basic_auth.status_code)
+                print('Successful Request:', basic_auth.status_code)
                 print(basic_auth_json['name'])
                 print(basic_auth_json['html_url'])
                 print('_'*60)
@@ -220,10 +220,11 @@ class GitHub():
         response = self.handel_requests(self.base_url + 'rate_limit', self.__headers, verbose)
 
         if response.status_code == 200:
-            self.save_JSON(response, './rate-limit.json', '', verbose)
+
             if verbose:
-                print(response.status_code)
-                print('_'*60)
+                print( json.dumps(response.json()['resources']['core'], indent=4) )
+
+            self.save_JSON(response, './rate-limit.json', '', verbose)
 
             return True
         else:
@@ -443,17 +444,17 @@ class GitHub():
             print("Wrong token, please try again.")
             sys.exit(1)
 
-        # cls_GitHub.get_owner_repostries(owner_name, verbose=True)
+        cls_GitHub.get_owner_repostries(owner, verbose=verbose)
 
-        # cls_GitHub.get_workflow(owner_name, repo_name, verbose=True)
+        cls_GitHub.get_workflow(owner, repo, verbose=verbose)
 
-        # cls_GitHub.get_runs(owner_name, repo_name, verbose=True)
+        cls_GitHub.get_runs(owner, repo, verbose=verbose)
 
         # TODO function to loop over run ids
 
-        # cls_GitHub.get_run_jobs(owner_name, repo_name, verbose=True)
+        # cls_GitHub.get_run_jobs(owner, repo, verbose=verbose)
 
-        # cls_GitHub.get_run_artifacts(owner_name, repo_name, verbose=True)
+        # cls_GitHub.get_run_artifacts(owner, repo, verbose=verbose)
 
 
 if __name__ == '__main__':
