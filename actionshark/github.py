@@ -3,8 +3,9 @@ from typing import Optional
 from time import sleep
 import os
 import sys
-
+from dataclasses import dataclass, field
 import requests
+from requests.api import head, options
 
 
 '''
@@ -12,7 +13,40 @@ Notes:
 API requests using Basic Authentication or OAuth, you can make up to 5,000 requests per hour.
 Secondary rate limits are not intended to interfere with legitimate use of the API.
 Your normal rate limits should be the only limit you target.
+
+Errors:
+400 Bad Request
+401 Unauthorized
+403 Forbidden *
+404 Not Found *
+422 Unprocessable Entity
 '''
+
+# @dataclass
+# class ErrorHandler():
+#     error_code: int
+#     is_error: bool = field(default=False)
+
+#     @is_error.setter
+#     def is_error(self, value: bool):
+#         self.is_error = value
+
+#     def error_handler(self):
+#         if self.error_code == 200:
+#             print('Successful Request.')
+#             # log.debug('')
+#             self.is_error = False
+
+#         elif self.error_code == 403:
+#             print('Limit exceeded.')
+#             # log.debug('')
+#             self.is_error = True
+
+#         elif self.error_code == 404:
+#             print('Error Request.')
+#             # log.debug('')
+#             self.is_error = True
+
 
 class GitHub():
     """
@@ -29,7 +63,7 @@ class GitHub():
 
     __sleep_interval = 2
 
-    __basic_auth_json = None
+    total_requests = 0
 
 
     def __init__(self, file_path: Optional[str] = None, env_variable: Optional[str] = None, with_token: bool = True, create_folders: bool = True) -> None:
@@ -61,36 +95,12 @@ class GitHub():
                 self.__token = os.environ.get(env_variable)
             else: self.__token = None
 
+
             if self.__token:
                 self.__headers['Authorization'] = f'token {self.__token}'
             else:
                 print(f'ERROR retriving token, please make sure you set the "file_path" or "env_variable" correctly.')
                 sys.exit(1)
-
-
-
-    def authenticate_user(self, token: Optional[str] = None, verbose: bool = False):
-        if not token: token = self.__token
-        else: self.__token = token
-
-        basic_auth = requests.get(self.base_url + 'user', headers=self.__headers)
-
-        if basic_auth.status_code == 200:
-            self.save_JSON('./auth.json', basic_auth, '', verbose)
-
-            self.__basic_auth_json = basic_auth.json()
-
-            if verbose:
-                print(basic_auth.status_code)
-                print(self.__basic_auth_json['name'])
-                print(self.__basic_auth_json['html_url'])
-
-
-            return True
-        else:
-            print(basic_auth.status_code)
-            print(basic_auth.reason)
-            return False
 
 
 
@@ -109,6 +119,8 @@ class GitHub():
         if not os.path.exists('data/jobs'): os.mkdir('data/jobs')
         # artifacts
         if not os.path.exists('data/artifacts'): os.mkdir('data/artifacts')
+
+
 
     @property
     def sleep_time(self):
@@ -130,6 +142,17 @@ class GitHub():
     @property
     def search_types(self):
         return [key for key in self.__search_dict.keys()]
+
+
+
+    def handel_requests(self, url: Optional[str] = None, header: Optional[dict] = None, verbose: bool = False):
+        if not url or not header: sys.exit(1)
+
+        response = requests.get(url, headers=header)
+        self.total_requests += 1
+        if verbose: print('Total Requests:', self.total_requests)
+
+        return response
 
 
 
@@ -171,6 +194,45 @@ class GitHub():
 
 
 
+    def authenticate_user(self, verbose: bool = False):
+
+        basic_auth = self.handel_requests(self.base_url + 'user', self.__headers, verbose)
+
+        if basic_auth.status_code == 200:
+            # self.save_JSON(basic_auth, './auth.json', '', verbose)
+            basic_auth_json = basic_auth.json()
+            if verbose:
+                print(basic_auth.status_code)
+                print(basic_auth_json['name'])
+                print(basic_auth_json['html_url'])
+                print('_'*60)
+
+            return True
+        else:
+            print(basic_auth.status_code)
+            print(basic_auth.reason)
+            return False
+
+
+
+    def get_limit(self, verbose: bool = False):
+
+        response = self.handel_requests(self.base_url + 'rate_limit', self.__headers, verbose)
+
+        if response.status_code == 200:
+            self.save_JSON(response, './rate-limit.json', '', verbose)
+            if verbose:
+                print(response.status_code)
+                print('_'*60)
+
+            return True
+        else:
+            print(response.status_code)
+            print(response.reason)
+            return False
+
+
+
     def parameter_constructor(self, q: dict):
         """Reformatting dictionary to GitHub API URL syntax.
 
@@ -181,6 +243,28 @@ class GitHub():
             str: Query string to add to GitHub URL
         """
         return '&'.join(['='.join(i) for i in q.items()])
+
+
+
+    def paginating(self, github_url: Optional[str] = None, page: int = 1, checker: Optional[str] = None, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False):
+
+        while True:
+
+            github_url += f'&page={page}'
+
+            response = self.handel_requests(github_url, self.__headers, verbose)
+
+            if verbose: print('GitHub API URL:', github_url)
+
+            iter_save_path = save_path[:-5] + f'_{page}.json'
+
+            if not self.save_JSON(response, iter_save_path, checker, verbose): break
+
+            github_url = github_url[:-len(f'&page={page}')]
+
+            page += 1
+
+            if use_sleep: sleep(self.__sleep_interval)
 
 
 
@@ -353,85 +437,37 @@ class GitHub():
 
 
 
-    def paginating(self, github_url: Optional[str] = None, page: int = 1, checker: Optional[str] = None, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False):
+    def get_all(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
 
-        while True:
+        if not self.authenticate_user(verbose):
+            print("Wrong token, please try again.")
+            sys.exit(1)
 
-            github_url += f'&page={page}'
+        # cls_GitHub.get_owner_repostries(owner_name, verbose=True)
 
-            response = requests.request('GET', github_url, headers=self.__headers)
+        # cls_GitHub.get_workflow(owner_name, repo_name, verbose=True)
 
-            if verbose: print('GitHub API URL:', github_url)
+        # cls_GitHub.get_runs(owner_name, repo_name, verbose=True)
 
-            iter_save_path = save_path[:-5] + f'_{page}.json'
+        # TODO function to loop over run ids
 
-            if not self.save_JSON(response, iter_save_path, checker, verbose): break
+        # cls_GitHub.get_run_jobs(owner_name, repo_name, verbose=True)
 
-            github_url = github_url[:-len(f'&page={page}')]
-
-            page += 1
-
-            if use_sleep: sleep(self.__sleep_interval)
-
+        # cls_GitHub.get_run_artifacts(owner_name, repo_name, verbose=True)
 
 
 if __name__ == '__main__':
 
     cls_GitHub = GitHub(env_variable = 'GITHUB_Token')
-
-    # test authorization using only token
-    # cls_GitHub.authenticate_user(verbose=True)
+    cls_GitHub.get_limit(verbose=True)
 
 
-    # test search issues with parameters
-    # q = {
-    #     'language' : 'python',
-    #     'star' : '>50',
-    #     'label' : 'open'
-    # }
-    # cls_GitHub.get_search('issues', q)
-
-
-    # test search for owner
-    # q = {'type':'org'}
-    # cls_GitHub.get_search('users', q)
-
-    # test get owner repositories
-    # owner_name = 'fireship-io'
-    # repo_name = 'fireship'
-    # cls_GitHub.get_owner_repostries(org_name)
-
-    # org_name = 'smartshark'
-    # cls_GitHub.get_owner_repostries(org_name)
-
-
-
-    # test jobs with paginating
-    # owner_name = 'freeCodeCamp'
-    # repo_name = 'freeCodeCamp'
-    # run_id = 1514809363
-    # cls_GitHub.get_run_jobs(owner_name, repo_name, run_id)
-
-
-    # test artifacts with paginating
     # owner_name = 'freeCodeCamp'
     # repo_name = 'freeCodeCamp'
     # run_id = 1511226364
-    # cls_GitHub.get_run_artifacts(owner_name, repo_name, run_id)
-
-    # test runs with paginating and created parameter
-    # last_stop = 251
-    # cls_GitHub.sleep_time = 1
-    # cls_GitHub.get_runs(owner_name, repo_name, page=last_stop, use_sleep=True, verbose=True)
-    # cls_GitHub.get_runs(owner_name, repo_name, created='2021-11-28', use_sleep=True, verbose=True)
+    # run_id = 1514809363
 
 
     owner_name = 'apache'
     repo_name = 'commons-lang'
-    cls_GitHub.get_owner_repostries(owner_name, verbose=True)
-    cls_GitHub.get_workflow(owner_name, repo_name, verbose=True)
-    cls_GitHub.get_runs(owner_name, repo_name, verbose=True)
-
-    # TODO function to loop over run ids
-    # cls_GitHub.get_run_jobs(owner_name, repo_name, verbose=True)
-    # cls_GitHub.get_run_artifacts(owner_name, repo_name, verbose=True)
+    # cls_GitHub.get_all(owner_name, repo_name, verbose=True)
