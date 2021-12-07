@@ -3,6 +3,7 @@ from typing import Optional
 from time import sleep
 import os
 import sys
+import datetime as dt
 from dataclasses import dataclass, field
 import requests
 from requests.api import head, options
@@ -21,31 +22,6 @@ Errors:
 404 Not Found *
 422 Unprocessable Entity
 '''
-
-# @dataclass
-# class ErrorHandler():
-#     error_code: int
-#     is_error: bool = field(default=False)
-
-#     @is_error.setter
-#     def is_error(self, value: bool):
-#         self.is_error = value
-
-#     def error_handler(self):
-#         if self.error_code == 200:
-#             print('Successful Request.')
-#             # log.debug('')
-#             self.is_error = False
-
-#         elif self.error_code == 403:
-#             print('Limit exceeded.')
-#             # log.debug('')
-#             self.is_error = True
-
-#         elif self.error_code == 404:
-#             print('Error Request.')
-#             # log.debug('')
-#             self.is_error = True
 
 
 class GitHub():
@@ -222,7 +198,11 @@ class GitHub():
         if response.status_code == 200:
 
             if verbose:
-                print( json.dumps(response.json()['resources']['core'], indent=4) )
+                temp = response.json()['resources']['core']
+                print(f'Limit :{temp["limit"]}')
+                print(f'Used :{temp["used"]}')
+                print(f'Remaining :{temp["remaining"]}')
+                print(f'Reset :{dt.datetime.fromtimestamp(temp["reset"])}')
 
             self.save_JSON(response, './rate-limit.json', '', verbose)
 
@@ -460,6 +440,7 @@ class GitHub():
 if __name__ == '__main__':
 
     cls_GitHub = GitHub(env_variable = 'GITHUB_Token')
+    # cls_GitHub.authenticate_user(verbose=True)
     cls_GitHub.get_limit(verbose=True)
 
 
@@ -471,4 +452,6 @@ if __name__ == '__main__':
 
     owner_name = 'apache'
     repo_name = 'commons-lang'
+    # cls_GitHub.get_owner_repostries(owner_name, repo_name)
+    # cls_GitHub.get_workflow(owner_name, repo_name)
     # cls_GitHub.get_all(owner_name, repo_name, verbose=True)
