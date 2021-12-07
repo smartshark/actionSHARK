@@ -2,11 +2,7 @@ import os
 import json
 import datetime as dt
 from mongoengine import connect
-from mongoengine.fields import StringField
 import pycoshark.utils as utils
-
-# https://cloud.mongodb.com/v2/6182ecb3f5d77671953f0a32#clusters
-# mongodb+srv://<username>:<password>@cluster0.3dpvx.mongodb.net/DB_name
 
 
 class Repositories(utils.Document):
@@ -26,7 +22,7 @@ class Repositories(utils.Document):
     watchers_count = utils.IntField()
     open_issues = utils.IntField()
     visibility = utils.StringField()
-    topics = utils.ListField( StringField() )
+    topics = utils.ListField( utils.StringField() )
 
 
 
@@ -47,7 +43,10 @@ class Workflows(utils.Document):
 
 
 class Runs(utils.Document):
-    id = utils.IntField(unique=True)
+    meta = {
+        'collection': 'runs'
+    }
+    id = utils.IntField(primary_key=True)
     name = utils.StringField()
     head_branch = utils.StringField()
     run_number = utils.IntField()
@@ -65,7 +64,10 @@ class Runs(utils.Document):
 
 
 class Jobs(utils.Document):
-    id = utils.IntField(unique=True)
+    meta = {
+        'collection': 'jobs'
+    }
+    id = utils.IntField(primary_key=True)
     name = utils.StringField()
     run_number = utils.ObjectIdField()
     run_attempt = utils.IntField()
@@ -82,7 +84,10 @@ class Jobs(utils.Document):
 
 
 class Artifacts(utils.Document):
-    id = utils.IntField(unique=True)
+    meta = {
+        'collection': 'artifacts'
+    }
+    id = utils.IntField(primary_key=True)
     name = utils.StringField()
     size_in_bytes = utils.IntField()
     archive_download_url = utils.StringField()
@@ -176,5 +181,5 @@ class Mongo:
 if __name__ == '__main__':
 
     cls_mongo = Mongo()
-    # cls_mongo.insert_JSON('./data/workflows/apache_commons-lang_workflows_1.json', 'save_workflows')
-    cls_mongo.insert_JSON('./data/repositories', 'save_repositories')
+    cls_mongo.insert_JSON('./data/workflows/apache_commons-lang_workflows_1.json', 'save_workflows')
+    # cls_mongo.insert_JSON('./data/repositories', 'save_repositories')
