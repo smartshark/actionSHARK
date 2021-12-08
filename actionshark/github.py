@@ -4,9 +4,7 @@ from time import sleep
 import os
 import sys
 import datetime as dt
-from dataclasses import dataclass, field
 import requests
-from requests.api import head, options
 
 
 '''
@@ -191,7 +189,7 @@ class GitHub():
 
 
 
-    def get_limit(self, verbose: bool = False):
+    def get_limit(self, verbose: bool = True):
 
         response = self.handel_requests(self.base_url + 'rate_limit', self.__headers, verbose)
 
@@ -331,7 +329,7 @@ class GitHub():
 
 
 
-    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, exclude_pull_requests: bool = True, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
+    def get_runs(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, page: int = 1, exclude_pull_requests: bool = False, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
         """Fetching workflow runs data from GitHub API for specific repository and owner.
 
         Args:
@@ -452,6 +450,7 @@ if __name__ == '__main__':
 
     owner_name = 'apache'
     repo_name = 'commons-lang'
-    # cls_GitHub.get_owner_repostries(owner_name, repo_name)
+    # cls_GitHub.get_owner_repostries(owner_name, repo_name, verbose=True)
     # cls_GitHub.get_workflow(owner_name, repo_name)
+    # cls_GitHub.get_runs(owner_name, repo_name, verbose=True)
     # cls_GitHub.get_all(owner_name, repo_name, verbose=True)

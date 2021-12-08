@@ -1,6 +1,9 @@
 import os
 import json
 import datetime as dt
+import github as gh
+
+
 from mongoengine import connect
 import pycoshark.utils as utils
 
@@ -48,18 +51,18 @@ class Runs(utils.Document):
     }
     id = utils.IntField(primary_key=True)
     name = utils.StringField()
-    head_branch = utils.StringField()
     run_number = utils.IntField()
     event = utils.StringField(max_length=15, required=True)
     status = utils.StringField()
     conclusion = utils.StringField()
-    workflow_id = utils.ObjectIdField()
-    pull_requests =  utils.DateTimeField(default=None)
+    workflow_id = utils.IntField()
+    pull_requests =  utils.ListField( utils.DictField(default=None) )
     created_at = utils.DateTimeField(default=None)
     updated_at = utils.DateTimeField(default=None)
     run_attempt = utils.IntField()
     run_started_at = utils.DateTimeField(default=None)
-    head_commit =  utils.ObjectIdField()
+    head_commit =  utils.DictField()
+    head_repository =  utils.DictField()
 
 
 
@@ -69,7 +72,7 @@ class Jobs(utils.Document):
     }
     id = utils.IntField(primary_key=True)
     name = utils.StringField()
-    run_number = utils.ObjectIdField()
+    run_id = utils.IntField()
     run_attempt = utils.IntField()
     status = utils.StringField()
     conclusion = utils.StringField()
@@ -105,7 +108,10 @@ class Mongo:
     def __init__(self, db_name: str = 'actionshark') -> None:
         self.__operations = {
             'save_workflows': ('workflows', self.__create_mongo_workflow),
-            'save_repositories': (None, self.__create_mongo_repo)
+            'save_repositories': (None, self.__create_mongo_repo),
+            'save_runs': ('workflow_runs', self.__create_mongo_run),
+            'save_jobs': ('jobs', self.__create_mongo_job),
+            'save_artifacts': ('artifacts', self.__create_mongo_artifact)
         }
         connect(db_name, host=self.__conn_uri)
 
@@ -138,22 +144,6 @@ class Mongo:
 
 
 
-    def __create_mongo_workflow(self, obj: json = None):
-        if not obj: return None
-
-        workflow = Workflows()
-
-        workflow.id = int( obj.get('id') )
-        workflow.name = obj.get('name')
-        workflow.path = obj.get('path')
-        workflow.state = obj.get('state')
-        workflow.created_at = dt.datetime.fromisoformat( obj.get('created_at') )
-        workflow.updated_at = dt.datetime.fromisoformat( obj.get('updated_at') )
-
-        return workflow
-
-
-
     def __create_mongo_repo(self, obj: json = None):
         if not obj: return None
 
@@ -178,8 +168,104 @@ class Mongo:
 
 
 
+    def __create_mongo_workflow(self, obj: json = None):
+        if not obj: return None
+
+        workflow = Workflows()
+
+        workflow.id = int( obj.get('id') )
+        workflow.name = obj.get('name')
+        workflow.path = obj.get('path')
+        workflow.state = obj.get('state')
+        workflow.created_at = dt.datetime.fromisoformat( obj.get('created_at') )
+        workflow.updated_at = dt.datetime.fromisoformat( obj.get('updated_at') )
+
+        return workflow
+
+
+
+    def __create_mongo_run(self, obj: json = None):
+        if not obj: return None
+
+        run = Runs()
+
+        run.id = int( obj.get('id') )
+        run.name = obj.get('name')
+        run.run_number = int( obj.get('run_number') )
+        run.event = obj.get('event')
+        run.status = obj.get('status')
+        run.conclusion = obj.get('conclusion')
+        run.workflow_id = int( obj.get('workflow_id') )
+        run.pull_requests = obj.get('pull_requests')
+        run.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        run.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        run.run_attempt = int( obj.get('run_attempt') )
+        run.run_started_at = obj.get('run_started_at')
+        run.head_commit = obj.get('head_commit')
+        run.head_repository = obj.get('head_repository')
+
+        return run
+
+
+
+    def __create_mongo_job(self, obj: json = None):
+        if not obj: return None
+
+        job = Jobs()
+
+        job.id = int( obj.get('id') )
+        job.name = obj.get('name')
+        job.run_id = int( obj.get('run_id') )
+        job.run_attempt = int( obj.get('run_attempt') )
+        job.status = obj.get('status')
+        job.conclusion = obj.get('conclusion')
+        job.started_at = dt.datetime.strptime( obj.get('started_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        job.completed_at = dt.datetime.strptime( obj.get('completed_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        job.steps = obj.get('steps')
+        job.runner_id = int( obj.get('runner_id') )
+        job.runner_name = obj.get('runner_name')
+        job.runner_group_id = int( obj.get('runner_group_id') )
+        job.runner_group_name = obj.get('runner_group_name')
+
+        return job
+
+
+
+    def __create_mongo_artifact(self, obj: json = None):
+        if not obj: return None
+
+        artifact = Artifacts()
+
+        artifact.id = int( obj.get('id') )
+        artifact.name = obj.get('name')
+        artifact.size_in_bytes = int( obj.get('size_in_bytes') )
+        artifact.archive_download_url = obj.get('archive_download_url')
+        artifact.expired = bool( obj.get('expired') )
+        artifact.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        artifact.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        artifact.expires_at = dt.datetime.strptime( obj.get('expires_at'), '%Y-%m-%dT%H:%M:%SZ' )
+
+        return artifact
+
+
 if __name__ == '__main__':
 
     cls_mongo = Mongo()
-    cls_mongo.insert_JSON('./data/workflows/apache_commons-lang_workflows_1.json', 'save_workflows')
+    # cls_mongo.insert_JSON('./data/workflows/apache_commons-lang_workflows_1.json', 'save_workflows')
     # cls_mongo.insert_JSON('./data/repositories', 'save_repositories')
+    # cls_mongo.insert_JSON('./data/runs', 'save_runs')
+    # cls_mongo.insert_JSON('./data/jobs', 'save_jobs')
+    # cls_mongo.insert_JSON('./data/artifacts', 'save_artifacts')
+
+
+
+    # cls_github = gh.GitHub(env_variable = 'GITHUB_Token')
+
+    # cls_github.get_limit()
+
+    # owner_name = 'apache'
+    # repo_name = 'commons-lang'
+    # for i, r in enumerate(Runs.objects()):
+    #     cls_github.get_run_artifacts(owner_name, repo_name, r.id, verbose=True) # not a single artifact found
+
+    # cls_github.get_limit()
