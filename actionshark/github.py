@@ -76,6 +76,7 @@ class GitHub():
 
         # add token to header and check initial quota
         self.__headers['Authorization'] = f'token {self.__token}'
+
         # main variables
         self.owner = owner
         self.repo = repo
@@ -95,7 +96,6 @@ class GitHub():
         self.limit, self.remaining, self.reset_datetime = self.get_limit()
         self.remaining -= 2
         self.reset_datetime += dt.timedelta(seconds=2)
-
 
 
 
@@ -137,7 +137,7 @@ class GitHub():
 
 
 
-    def limit_handler(self) -> bool:
+    def limit_handler(self) -> None:
         """Get Request manager
 
         Args:
@@ -149,35 +149,46 @@ class GitHub():
             requests.Response: return response as received
         """
 
-        # if an hour passed and requests are not triggered, renew limit variables
-        # if  (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
-        #     self.remaining, self.reset_datetime = self.get_limit()
-
-        #     # add error margin
-        #     self.remaining -= 2
-        #     self.reset_datetime -= dt.timedelta(seconds=2)
-        #     self.last_stop_datetime = self.get_dt_now()
-        #     ...
+        # 401 = 'Unauthorized'
+        # 403 = 'rate limit exceeded'
 
         # # handel limitation
-        # if self.remaining == 1:
-        #     # save last action to continue
-        #     # function
-        #     # page
-        #     #
-        #     #
-        #     #
-        #     #
-        #     self.last_stop_datetime = dt.datetime.now().replace(microsecond=0)
-        #     self.force_to_sleep = self.last_stop_datetime - self.reset_datetime + dt.timedelta(seconds=2)
-        #     sleep()
+        if self.remaining <= 1:
+            self.last_stop_datetime = dt.datetime.now().replace(microsecond=0)
+            self.force_to_sleep = (self.reset_datetime - self.last_stop_datetime).seconds
+            # refetching the page when limit exceeded
+            self.page -= 1
+
+            if self.verbose:
+                print(f'Limit handler is triggered, program will sleep for approximately {self.force_to_sleep} seconds.')
+
+            # long sleep till limit reset
+            sleep(self.force_to_sleep)
+
+            self.limit, self.remaining, self.reset_datetime = self.get_limit()
+            self.remaining -= 2
+            self.reset_datetime += dt.timedelta(seconds=2)
+
+            if self.verbose:
+                print(f'Continue with {self.current_action} from page {self.page}...')
+
+
+
+        # if an hour passed and requests are not triggered, renew limit variables
+        if  (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
+
+            # update limit variables and error margin
+            self.limit, self.remaining, self.reset_datetime = self.get_limit()
+            self.remaining -= 2
+            self.reset_datetime += dt.timedelta(seconds=2)
+
+            if self.verbose:
+                print(f'Update limit handler variables.')
 
 
         # updating variables to deal with limits
         self.total_requests += 1
-        # self.remaining -= 1
-
-        ...
+        self.remaining -= 1
 
 
 
@@ -226,6 +237,7 @@ class GitHub():
 
             return True
         else:
+            # 401 = 'Unauthorized'
             print(basic_auth.status_code)
             print(basic_auth.reason)
             return False
@@ -286,13 +298,10 @@ class GitHub():
             # Abort if unknown error occurred
             if response.status_code != 200 and response.status_code != 403:
                 print("Error in request.")
+                print(response.status_code)
+                print(response)
                 sys.exit(1)
 
-            # handel api limit
-            if response.status_code == 403:
-                # update variable
-                # handel limit error
-                ...
 
             # check if key is not empty
             response_JSON = response.json()
@@ -305,9 +314,15 @@ class GitHub():
                     print(f'Response is Empty ... Stopping.\n', '-+'*30, sep='')
                 break
 
+            # ?function to save documents to mongodb
             # *DEBUGGING
             iter_save_path = save_path[:-5] + f'_{self.page}.json'
             self.save_JSON(response_JSON, iter_save_path)
+
+
+            # handel limit and error 403
+            self.limit_handler()
+
 
             # handel page incrementing
             github_url = github_url[:-len(f'&page={self.page}')]
@@ -330,6 +345,8 @@ class GitHub():
         url = self.actions_url['repos'].format(org=self.owner, per_page=self.per_page)
         github_url = self.api_url + url
 
+
+        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/repositories/{self.owner}_repos.json'
 
@@ -349,6 +366,8 @@ class GitHub():
         url = self.actions_url['workflows'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
         github_url = self.api_url + url
 
+
+        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/workflows/{self.owner}_{self.repo}_workflows.json'
 
@@ -370,6 +389,8 @@ class GitHub():
         url += f'exclude_pull_requests={str(exclude_pull_requests)}'
         github_url = self.api_url + url
 
+
+        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/runs/{self.owner}_{self.repo}_runs.json'
 
@@ -394,6 +415,8 @@ class GitHub():
         url = self.actions_url['artifacts'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
         github_url = self.api_url + url
 
+
+        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
 
@@ -418,6 +441,8 @@ class GitHub():
         url = self.actions_url['jobs'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
         github_url = self.api_url + url
 
+
+        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/jobs/{self.owner}_{self.repo}_run_{run_id}_jobs.json'
 
@@ -459,12 +484,11 @@ if __name__ == '__main__':
     repo_name = 'commons-lang'
 
     cls_GitHub = GitHub(owner=owner_name, repo=repo_name, env_variable='GITHUB_Token', verbose=True)
-    print(cls_GitHub)
+    # print(cls_GitHub)
     # cls_GitHub.authenticate_user()
 
-
     # cls_GitHub.get_owner_repostries()
-    # cls_GitHub.get_workflows()
+    cls_GitHub.get_workflows()
     # cls_GitHub.get_runs()
     # cls_GitHub.get_all()
 
