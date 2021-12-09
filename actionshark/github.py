@@ -40,41 +40,40 @@ class GitHub():
     total_requests = 0
 
 
-    def __init__(self, file_path: Optional[str] = None, env_variable: Optional[str] = None, with_token: bool = True, create_folders: bool = True) -> None:
+    def __init__(self, file_path: Optional[str] = None, env_variable: Optional[str] = None, create_folders: bool = True) -> None:
         """
         Extract Token from settings file for Authentication"""
         if create_folders: self.create_folders()
         self.__headers = {'Accept': 'application/vnd.github.v3+json'}
 
 
-        if with_token:
-            if not file_path and not env_variable:
-                print(f'ERROR: Add the path to JSON file with Access Token')
+        if not file_path and not env_variable:
+            print(f'ERROR: Add the path to JSON file with Access Token')
+            sys.exit(1)
+
+        if file_path:
+            if not file_path.split('.')[-1] == 'json':
+                print('Please pass a "json" file path or add file extention in case the file is "json".')
                 sys.exit(1)
 
-            if file_path:
-                if not file_path.split('.')[-1] == 'json':
-                    print('Please pass a "json" file path or add file extention in case the file is "json".')
-                    sys.exit(1)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = json.load(f)
+            self.__token = lines.get('access_token')
 
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    lines = json.load(f)
-                self.__token = lines.get('access_token')
-
-                if not self.__token:
-                    print('Please set the token key to "access_token".')
-                    sys.exit(1)
-
-            elif env_variable:
-                self.__token = os.environ.get(env_variable)
-            else: self.__token = None
-
-
-            if self.__token:
-                self.__headers['Authorization'] = f'token {self.__token}'
-            else:
-                print(f'ERROR retriving token, please make sure you set the "file_path" or "env_variable" correctly.')
+            if not self.__token:
+                print('Please set the token key to "access_token".')
                 sys.exit(1)
+
+        elif env_variable:
+            self.__token = os.environ.get(env_variable)
+        else: self.__token = None
+
+
+        if self.__token:
+            self.__headers['Authorization'] = f'token {self.__token}'
+        else:
+            print(f'ERROR retriving token, please make sure you set the "file_path" or "env_variable" correctly.')
+            sys.exit(1)
 
 
 
@@ -124,7 +123,8 @@ class GitHub():
 
         response = requests.get(url, headers=header)
         self.total_requests += 1
-        if verbose: print('+ Total Requests:', self.total_requests)
+        if verbose:
+            print('+ Total Requests:', self.total_requests)
 
         return response
 
@@ -142,11 +142,13 @@ class GitHub():
 
             response_JSON = response.json()
 
-            if verbose: print('Successful Request!')
+            if verbose:
+                print('Successful Request!')
 
             if checker:
                 if not response_JSON.get(checker):
-                    if verbose: print(f'Response is Empty ... Stopping.\n', '-+'*30, sep='')
+                    if verbose:
+                        print(f'Response is Empty ... Stopping.\n', '-+'*30, sep='')
                     return False
             else:
                 if not response_JSON: return False
@@ -154,14 +156,16 @@ class GitHub():
 
             with open( save_path, 'w', encoding='utf-8') as f:
                 json.dump(response_JSON, f, indent=4)
-            if verbose: print(f'Response is saved in: {save_path}')
-            if verbose: print('_'*(25+len(save_path)))
+            if verbose:
+                print(f'Response is saved in: {save_path}')
+                print('_'*(25+len(save_path)))
 
             return True
 
         else:
             print(f'ERROR: {response.status_code}')
-            if verbose: print(f'ERROR: {response.reason}')
+            if verbose:
+                print(f'ERROR: {response.reason}')
             print('-'*len(response.reason))
 
             return False
@@ -233,7 +237,8 @@ class GitHub():
 
             response = self.handel_requests(github_url, self.__headers, verbose)
 
-            if verbose: print('GitHub API URL:', github_url)
+            if verbose:
+                print('GitHub API URL:', github_url)
 
             iter_save_path = save_path[:-5] + f'_{page}.json'
 
@@ -269,7 +274,8 @@ class GitHub():
 
         github_url += '&per_page=' + str(per_page)
 
-        if verbose: print('GitHub API URL:', github_url)
+        if verbose:
+            print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/search/search_{search_type}.json'
@@ -294,7 +300,8 @@ class GitHub():
         url = 'orgs/{org}/repos?per_page={per_page}'
         github_url = self.base_url + url.format(org=owner, per_page=per_page)
 
-        if verbose: print('GitHub API URL:', github_url)
+        if verbose:
+            print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/repositories/{owner}_repos.json'
@@ -320,7 +327,8 @@ class GitHub():
 
         github_url = self.base_url + url.format(owner=owner, repo=repo, per_page=per_page)
 
-        if verbose: print('GitHub API URL:', github_url)
+        if verbose:
+            print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/workflows/{owner}_{repo}_workflows.json'
@@ -353,7 +361,8 @@ class GitHub():
         url = 'repos/{owner}/{repo}/actions/runs'
         github_url = self.base_url + url.format(owner=owner, repo=repo) + f'?{self.parameter_constructor(q)}'
 
-        if verbose: print('GitHub API URL:', github_url)
+        if verbose:
+            print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/runs/{owner}_{repo}_runs.json'
@@ -380,7 +389,8 @@ class GitHub():
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page{per_page}'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id, per_page=per_page)
 
-        if verbose: print('GitHub API URL:', github_url)
+        if verbose:
+            print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/artifacts/{owner}_{repo}_run_{run_id}_artifacts.json'
@@ -407,7 +417,8 @@ class GitHub():
         url = 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page{per_page}'
         github_url = self.base_url + url.format(owner=owner, repo=repo, run_id=run_id, per_page=per_page)
 
-        if verbose: print('GitHub API URL:', github_url)
+        if verbose:
+            print('GitHub API URL:', github_url)
 
         if not save_path:
             save_path = f'./data/jobs/{owner}_{repo}_run_{run_id}_jobs.json'
@@ -418,21 +429,23 @@ class GitHub():
 
     def get_all(self, owner: Optional[str] = None, repo: Optional[str] = None, run_id: Optional[int] = None, per_page: int = 100, page: int = 1, save_path: Optional[str] = None, use_sleep: bool = True, verbose: bool = False) -> None:
 
-        if not self.authenticate_user(verbose):
-            print("Wrong token, please try again.")
-            sys.exit(1)
+        # if not self.authenticate_user(verbose):
+        #     print("Wrong token, please try again.")
+        #     sys.exit(1)
 
-        cls_GitHub.get_owner_repostries(owner, verbose=verbose)
+        # cls_GitHub.get_owner_repostries(owner, verbose=verbose)
 
-        cls_GitHub.get_workflow(owner, repo, verbose=verbose)
+        # cls_GitHub.get_workflow(owner, repo, verbose=verbose)
 
-        cls_GitHub.get_runs(owner, repo, verbose=verbose)
+        # cls_GitHub.get_runs(owner, repo, verbose=verbose)
 
         # TODO function to loop over run ids
 
         # cls_GitHub.get_run_jobs(owner, repo, verbose=verbose)
 
         # cls_GitHub.get_run_artifacts(owner, repo, verbose=verbose)
+
+        ...
 
 
 if __name__ == '__main__':
