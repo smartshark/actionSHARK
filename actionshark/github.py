@@ -83,7 +83,7 @@ class GitHub():
 
 
         # add token to header and check initial quota
-        # self.__headers['Authorization'] = f'token {self.__token}'
+        self.__headers['Authorization'] = f'token {self.__token}'
 
         # MongoDB
         self.save_mongo = save_mongo
@@ -268,7 +268,7 @@ class GitHub():
 
             # handel case: limit achieved and action was not fully fetched -> stopped while paginating
             # handel case: got response but was last action page and last remaining the same time
-            if response.status_code == 403 or self.remaining <= 1:
+            if response.status_code == 403 or self.remaining < 1:
                 self.limit_handler()
                 # skip current loop with same action and page
                 continue
@@ -435,16 +435,16 @@ class GitHub():
 
     def get_all(self, runs_object = None) -> None:
 
-        # if not self.authenticate_user():
-        #     print("Wrong token, please try again.")
-        #     sys.exit(1)
+        if not self.authenticate_user():
+            print("Wrong token, please try again.")
+            sys.exit(1)
 
         self.get_owner_repostries()
         self.get_workflows()
         self.get_runs()
 
         # if Runs object was passed, for each Run get
-        if not runs_object:
+        if runs_object:
             # get
             for run in runs_object.objects():
                 self.get_jobs(run.id)
