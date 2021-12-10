@@ -286,7 +286,7 @@ class GitHub():
                 break
 
             # ?function to save documents to mongodb
-            self.save_mongo(response_JSON, self.current_action)
+            # self.save_mongo(response_JSON, self.current_action)
 
             # *DEBUGGING
             self.save_JSON(response_JSON, save_path)
@@ -303,7 +303,7 @@ class GitHub():
             self.remaining -= 1
 
             # *DEBUGGING
-            print(f'Reamining: {self.remaining}')
+            print(f'Remaining: {self.remaining}')
 
 
             # handel case: limit was not reached and an hour passed -> reset limit variables
@@ -331,7 +331,7 @@ class GitHub():
 
 
         if not save_path:
-            save_path = f'./data/repositories/{self.owner}_repos.json'
+            save_path = f'./actionshark/data/repositories/{self.owner}_repos.json'
 
         self.paginating(github_url, None, save_path)
 
@@ -352,7 +352,7 @@ class GitHub():
 
 
         if not save_path:
-            save_path = f'./data/workflows/{self.owner}_{self.repo}_workflows.json'
+            save_path = f'./actionshark/data/workflows/{self.owner}_{self.repo}_workflows.json'
 
         self.paginating(github_url, 'workflows', save_path)
 
@@ -375,7 +375,7 @@ class GitHub():
 
 
         if not save_path:
-            save_path = f'./data/runs/{self.owner}_{self.repo}_runs.json'
+            save_path = f'./actionshark/data/runs/{self.owner}_{self.repo}_runs.json'
 
         self.paginating(github_url, 'workflow_runs', save_path)
 
@@ -401,7 +401,7 @@ class GitHub():
 
 
         if not save_path:
-            save_path = f'./data/jobs/{self.owner}_{self.repo}_run_{run_id}_jobs.json'
+            save_path = f'./actionshark/data/jobs/{self.owner}_{self.repo}_run_{run_id}_jobs.json'
 
         self.paginating(github_url, 'jobs', save_path)
 
@@ -427,7 +427,7 @@ class GitHub():
 
 
         if not save_path:
-            save_path = f'./data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
+            save_path = f'./actionshark/data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
 
         self.paginating(github_url, 'artifacts', save_path)
 
