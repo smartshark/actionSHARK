@@ -28,17 +28,24 @@ class GitHub():
     limit_handler_counter = 0
 
 
-    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, file_path: Optional[str] = None, env_variable: Optional[str] = None, debug_mode: bool = True, sleep_interval: int = 2, verbose: bool = True) -> None:
+    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, file_path: Optional[str] = None, env_variable: Optional[str] = None, save_mongo = None, debug_mode: bool = True, sleep_interval: int = 2, verbose: bool = True) -> None:
         """Extract Token from settings file or environment variable for Authentication.
 
         Args:
+            owner (Optional[str], optional): [description]. Defaults to None.
+            repo (Optional[str], optional): [description]. Defaults to None.
+            per_page (int, optional): [description]. Defaults to 100.
             file_path (Optional[str], optional): [description]. Defaults to None.
             env_variable (Optional[str], optional): [description]. Defaults to None.
-            create_folders (bool, optional): [description]. Defaults to True.
+            save_mongo (Optional[function], optional): [description]. Defaults to None.
+            debug_mode (bool, optional): [description]. Defaults to True.
+            sleep_interval (int, optional): [description]. Defaults to 2.
+            verbose (bool, optional): [description]. Defaults to True.
         """
 
         # *DEVELOPPING
-        if debug_mode: self.create_folders()
+        if debug_mode:
+            self.create_folders()
 
         # check either json file or environment variable got passed
         if not file_path and not env_variable:
@@ -78,6 +85,9 @@ class GitHub():
         # add token to header and check initial quota
         # self.__headers['Authorization'] = f'token {self.__token}'
 
+        # MongoDB
+        self.save_mongo = save_mongo
+
         # main variables
         self.owner = owner
         self.repo = repo
@@ -87,14 +97,15 @@ class GitHub():
         self.verbose = verbose
 
         # initiate limit variables
-        self.update_limit_handler()
+        self.update_limit_variables()
         self.last_stop_datetime = self.get_dt_now()
 
 
 
     def __str__(self) -> str:
         return '\n'.join([
-            f"Owner/Org: {self.owner}",
+            "_"*30, ""
+            f"Owner: {self.owner}",
             f"Repository: {self.repo}",
             f"API URL: {self.api_url}",
             f"Limit requests: {self.limit}",
@@ -108,22 +119,37 @@ class GitHub():
 
 
 
-    # *DEVELOPPING
-    def create_folders(self):
-        # main data
-        if not os.path.exists('data'): os.mkdir('data')
-        # search
-        if not os.path.exists('data/search'): os.mkdir('data/search')
-        # repositories
-        if not os.path.exists('data/repositories'): os.mkdir('data/repositories')
-        # workflows
-        if not os.path.exists('data/workflows'): os.mkdir('data/workflows')
-        # runs
-        if not os.path.exists('data/runs'): os.mkdir('data/runs')
-        # jobs
-        if not os.path.exists('data/jobs'): os.mkdir('data/jobs')
-        # artifacts
-        if not os.path.exists('data/artifacts'): os.mkdir('data/artifacts')
+    def authenticate_user(self, verbose: bool = False):
+        """[summary]
+
+        Args:
+            verbose (bool, optional): [description]. Defaults to False.
+        """
+
+        basic_auth = requests.get(self.api_url + 'user', self.__headers)
+
+        self.total_requests += 1
+        self.remaining -= 1
+
+        if basic_auth.status_code == 200:
+
+            self.is_authenticated = True
+
+            basic_auth_json = basic_auth.json()
+
+            if verbose:
+                print('Successful Request:', basic_auth.status_code)
+                print(basic_auth_json['name'])
+                print(basic_auth_json['html_url'])
+                print('_'*60)
+
+        else:
+            self.is_authenticated = False
+
+            if verbose:
+                # 401 = 'Unauthorized'
+                print(basic_auth.status_code)
+                print(basic_auth.reason)
 
 
 
@@ -132,115 +158,11 @@ class GitHub():
 
 
 
-    def limit_handler(self) -> None:
-        """Get Request manager
-
-        Args:
-            url (Optional[str], optional): [description]. Defaults to None.
-            header (Optional[dict], optional): [description]. Defaults to None.
-            verbose (bool, optional): [description]. Defaults to False.
-
-        Returns:
-            requests.Response: return response as received
-        """
-
-        # 401 = 'Unauthorized'
-        # 403 = 'rate limit exceeded'
-
-        self.last_stop_datetime = dt.datetime.now().replace(microsecond=0)
-        self.force_to_sleep = (self.reset_datetime - self.last_stop_datetime).seconds
-
-        # refetching the page when limit exceeded
-        self.page -= 1
-
-        self.limit_handler_counter += 1
-
-        if self.verbose:
-            print(f'Limit handler is triggered, program will sleep for approximately {self.force_to_sleep} seconds.')
-
-        # long sleep till limit reset
-        sleep(self.force_to_sleep)
-
-        self.update_limit_handler()
-
-        if self.verbose:
-            print(f'Continue with {self.current_action} from page {self.page}...')
-
-
-
-    def update_limit_handler(self):
-        # update limit variables and error margin
-        self.get_limit()
-        self.remaining -= 2
-        self.reset_datetime += dt.timedelta(seconds=2)
-
-        if self.verbose:
-            print(f'Update limit handler variables.')
-
-
-
-    # *DEBUGGING
-    def save_JSON(self, response: json, save_path: Optional[str] = None) -> None:
-        """Saving a JSON response from GitHub API after checking response status.
-
-        Args:
-            response (requests.models.Response): The response from GitHub API.
-            save_path (str): File name and path to where the response should be saved.
-            checker (Optional[str], optional): Key to check in JSON response in case the response is empty. Defaults to None.
-            verbose (bool): Print extra information to console.
-
-        Returns:
-            bool: True if response is not empty and saved saved successfully, otherwise False.
-        """
-
-            # save file
-        with open( save_path, 'w', encoding='utf-8') as f:
-            json.dump(response, f, indent=4)
-
-        if self.verbose:
-            print(f'Response is saved in: {save_path}')
-            print('_'*(25+len(save_path)))
-
-
-
-    def authenticate_user(self):
-        """[summary]
-
-        Returns:
-            [type]: [description]
-        """
-
-        basic_auth = requests.get(self.api_url + 'user', self.__headers)
-
-        if basic_auth.status_code == 200:
-
-            self.is_authenticated = True
-
-            basic_auth_json = basic_auth.json()
-
-            if self.verbose:
-                print('Successful Request:', basic_auth.status_code)
-                print(basic_auth_json['name'])
-                print(basic_auth_json['html_url'])
-                print('_'*60)
-
-        else:
-            # 401 = 'Unauthorized'
-            print(basic_auth.status_code)
-            print(basic_auth.reason)
-
-            self.is_authenticated = False
-
-
-
     def get_limit(self, verbose: bool = False):
         """Collect limitation parameters.
 
         Args:
             verbose (bool, optional): [description]. Defaults to False.
-
-        Returns:
-            [type]: [description]
         """
 
         response = requests.get(self.api_url + 'rate_limit', headers=self.__headers)
@@ -252,15 +174,64 @@ class GitHub():
             self.limit = temp["limit"]
 
             if verbose: # local verbose
+                print("__"*30)
                 print(f'Limit :{self.limit}')
                 print(f'Used :{temp["used"]}')
                 print(f'Remaining :{self.remaining}')
                 print(f'Reset :{self.reset_datetime}')
-                print("_"*30)
+                print("__"*30)
 
         else:
             print(response.status_code)
             print(response.reason)
+
+
+
+    def limit_handler(self) -> None:
+        """Handel limitation by sleeping till next reset time.
+        """
+
+        # 401 = 'Unauthorized'
+        # 403 = 'rate limit exceeded'
+
+        self.last_stop_datetime = dt.datetime.now().replace(microsecond=0)
+        self.force_to_sleep = (self.reset_datetime - self.last_stop_datetime).seconds
+
+        # to continue from the page when limit exceeded
+        # self.page -= 1
+
+        self.limit_handler_counter += 1
+
+        if self.verbose:
+            print('\\\\'*40)
+            print(f'Limit handler is triggered, program will sleep for approximately {self.force_to_sleep:n} seconds.')
+            print(f'Next Restart will be on {self.reset_datetime.time()}')
+            print('//'*40)
+
+        # long sleep till limit reset
+        sleep(self.force_to_sleep)
+
+        # update limit variables
+        self.update_limit_variables()
+
+        if self.verbose:
+            print('\\\\'*40)
+            print(f'Continue with {self.current_action} from page {self.page}...')
+
+            #* DEBUGGING
+            self.get_limit(verbose=True)
+            print('//'*40)
+
+
+
+    def update_limit_variables(self):
+        # update limit variables and error margin
+        self.get_limit()
+        self.remaining -= 2
+        self.reset_datetime += dt.timedelta(seconds=2)
+
+        if self.verbose:
+            print(f'Update limit handler variables.')
 
 
 
@@ -272,6 +243,11 @@ class GitHub():
             checker (Optional[str], optional): [description]. Defaults to None.
             save_path (Optional[str], optional): [description]. Defaults to None.
         """
+
+        # case 1: limit achieved and action was not fully fetched -> stopped while paginating
+        # case 2: got response but was last action page and last remaining the same time
+        # case 3: still remaining and last page was achieved -> jump to next action
+        # case 4: limit was not reached and an hour passed -> reset limit variables
 
         while True:
             # append page number to url
@@ -290,33 +266,31 @@ class GitHub():
                 print(response)
                 sys.exit(1)
 
-            # case 1: limit achieved and action was not fully fetched -> stopped while paginating
-            # case 2: got response but was last action page and last remaining the same time
-            # case 3: still remaining and last page was achieved -> jump to next action
-            # case 4: limit was not reached and an hour passed -> reset limit variables
-
             # handel case: limit achieved and action was not fully fetched -> stopped while paginating
-            if response.status_code == 403:
+            # handel case: got response but was last action page and last remaining the same time
+            if response.status_code == 403 or self.remaining <= 1:
                 self.limit_handler()
+                # skip current loop with same action and page
+                continue
 
             # check if key is not empty
             response_JSON = response.json()
             if checker:
                 response_JSON = response_JSON.get(checker)
 
+            # handel case: limit was not reached and an hour passed -> reset limit variables
             if not response_JSON:
                 if self.verbose:
-                    print(f'Response is Empty ... Stopping.\n', '-+'*30, sep='')
+                    print(f'Response is Empty ... Stopping.')
+                    print('NEXT ACTION:','> >'*30 ,'\n')
                 break
 
             # ?function to save documents to mongodb
-            # *DEBUGGING
-            iter_save_path = save_path[:-5] + f'_{self.page}.json'
-            self.save_JSON(response_JSON, iter_save_path)
+            for obj in response_JSON:
+                self.save_mongo(obj, self.current_action)
 
-            # handel case: got response but was last action page and last remaining the same time
-            if self.remaining <= 1:
-                self.limit_handler()
+            # *DEBUGGING
+            self.save_JSON(response_JSON, save_path)
 
             # handel page incrementing
             github_url = github_url[:-len(f'&page={self.page}')]
@@ -329,10 +303,13 @@ class GitHub():
             self.total_requests += 1
             self.remaining -= 1
 
+            # *DEBUGGING
+            print(f'Reamining: {self.remaining}')
+
 
             # handel case: limit was not reached and an hour passed -> reset limit variables
             if (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
-                self.update_limit_handler()
+                self.update_limit_variables()
 
 
 
@@ -343,6 +320,10 @@ class GitHub():
             save_path (Optional[str], optional): [description]. Defaults to None.
         """
 
+        # if not save_mongo:
+        #     print('Please pass a function to save response in MongoDB.')
+        #     sys.exit(1)
+
         self.current_action = 'repos'
         self.page = 1
 
@@ -350,14 +331,10 @@ class GitHub():
         github_url = self.api_url + url
 
 
-        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/repositories/{self.owner}_repos.json'
 
         self.paginating(github_url, None, save_path)
-
-        # *DEBUGGING
-        self.get_limit(verbose=True)
 
 
 
@@ -375,14 +352,10 @@ class GitHub():
         github_url = self.api_url + url
 
 
-        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/workflows/{self.owner}_{self.repo}_workflows.json'
 
         self.paginating(github_url, 'workflows', save_path)
-
-        # *DEBUGGING
-        self.get_limit(verbose=True)
 
 
 
@@ -398,22 +371,18 @@ class GitHub():
         self.page = 1
 
         url = self.actions_url['runs'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
-        url += f'exclude_pull_requests={str(exclude_pull_requests)}'
+        url += f'&exclude_pull_requests={str(exclude_pull_requests)}'
         github_url = self.api_url + url
 
 
-        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/runs/{self.owner}_{self.repo}_runs.json'
 
         self.paginating(github_url, 'workflow_runs', save_path)
 
-        # *DEBUGGING
-        self.get_limit(verbose=True)
 
 
-
-    def get_jobs(self, run_id: Optional[int] = None, save_path: Optional[str] = None) -> None:
+    def get_jobs(self, run_id = None, save_path: Optional[str] = None) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -432,7 +401,6 @@ class GitHub():
         github_url = self.api_url + url
 
 
-        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/jobs/{self.owner}_{self.repo}_run_{run_id}_jobs.json'
 
@@ -440,7 +408,7 @@ class GitHub():
 
 
 
-    def get_artifacts(self, run_id: Optional[int] = None, save_path: Optional[str] = None) -> None:
+    def get_artifacts(self, run_id = None, save_path: Optional[str] = None) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -459,7 +427,6 @@ class GitHub():
         github_url = self.api_url + url
 
 
-        # ?function to save documents to mongodb instead of save_path
         if not save_path:
             save_path = f'./data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
 
@@ -467,11 +434,11 @@ class GitHub():
 
 
 
-    def get_all(self, runs_object = None, ignore_authentication: bool = True, save_path: Optional[str] = None) -> None:
+    def get_all(self, runs_object = None) -> None:
 
-        if not self.authenticate_user() and ignore_authentication:
-            print("Wrong token, please try again.")
-            sys.exit(1)
+        # if not self.authenticate_user():
+        #     print("Wrong token, please try again.")
+        #     sys.exit(1)
 
         self.get_owner_repostries()
         self.get_workflows()
@@ -479,9 +446,58 @@ class GitHub():
 
         # if Runs object was passed, for each Run get
         if not runs_object:
+            # get
             for run in runs_object.objects():
                 self.get_jobs(run.id)
+
+            for run in runs_object.objects():
                 self.get_artifacts(run.id)
+
+
+
+    # *DEVELOPPING
+    def create_folders(self):
+        # main data
+        if not os.path.exists('./actionshark/data'): os.mkdir('./actionshark/data')
+        # search
+        if not os.path.exists('./actionshark/data/search'): os.mkdir('./actionshark/data/search')
+        # repositories
+        if not os.path.exists('./actionshark/data/repositories'): os.mkdir('./actionshark/data/repositories')
+        # workflows
+        if not os.path.exists('./actionshark/data/workflows'): os.mkdir('./actionshark/data/workflows')
+        # runs
+        if not os.path.exists('./actionshark/data/runs'): os.mkdir('./actionshark/data/runs')
+        # jobs
+        if not os.path.exists('./actionshark/data/jobs'): os.mkdir('./actionshark/data/jobs')
+        # artifacts
+        if not os.path.exists('./actionshark/data/artifacts'): os.mkdir('./actionshark/data/artifacts')
+
+
+
+    # *DEBUGGING
+    def save_JSON(self, response: json, save_path: Optional[str] = None) -> None:
+        """Saving a JSON response from GitHub API after checking response status.
+
+        Args:
+            response (requests.models.Response): The response from GitHub API.
+            save_path (str): File name and path to where the response should be saved.
+            checker (Optional[str], optional): Key to check in JSON response in case the response is empty. Defaults to None.
+            verbose (bool): Print extra information to console.
+
+        Returns:
+            bool: True if response is not empty and saved saved successfully, otherwise False.
+        """
+
+        # add page number to the file name
+        save_path = save_path[:-5] + f'_{self.page}.json'
+
+        # save file
+        with open( save_path, 'w', encoding='utf-8') as f:
+            json.dump(response, f, indent=4)
+
+        if self.verbose:
+            print(f'Response is saved in: {save_path}')
+            print('__'*len(save_path))
 
 
 
@@ -498,8 +514,13 @@ if __name__ == '__main__':
     repo_name = 'commons-lang'
 
     cls_GitHub = GitHub(owner=owner_name, repo=repo_name, env_variable='GITHUB_Token', verbose=True)
+
+    # print(cls_GitHub)
+    # for _ in range(58):
+    #     cls_GitHub.authenticate_user()
+
     print(cls_GitHub)
 
-    cls_GitHub.get_all(ignore_authentication=False)
+    cls_GitHub.get_all()
 
     cls_GitHub.get_limit(verbose=True)
