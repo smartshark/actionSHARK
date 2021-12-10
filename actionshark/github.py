@@ -15,9 +15,6 @@ class GitHub():
     api_url = 'https://api.github.com/'
     __headers = {'Accept': 'application/vnd.github.v3+json'}
 
-    total_requests = 0
-    current_action = None
-
     actions_url = {
         'repos': 'orgs/{org}/repos?per_page={per_page}',
         'workflows': 'repos/{owner}/{repo}/actions/workflows?per_page={per_page}',
@@ -25,6 +22,10 @@ class GitHub():
         'jobs': 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page{per_page}',
         'artifacts': 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page{per_page}'
     }
+
+    total_requests = 0
+    current_action = None
+    limit_handler_counter = 0
 
 
     def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, file_path: Optional[str] = None, env_variable: Optional[str] = None, debug_mode: bool = True, sleep_interval: int = 2, verbose: bool = True) -> None:
@@ -75,7 +76,7 @@ class GitHub():
 
 
         # add token to header and check initial quota
-        self.__headers['Authorization'] = f'token {self.__token}'
+        # self.__headers['Authorization'] = f'token {self.__token}'
 
         # main variables
         self.owner = owner
@@ -86,30 +87,24 @@ class GitHub():
         self.verbose = verbose
 
         # initiate limit variables
-        self.limit = None
-        self.remaining = None
-        self.reset_datetime = self.get_dt_now()
+        self.update_limit_handler()
         self.last_stop_datetime = self.get_dt_now()
-
-
-        # update limit variables and error margin
-        self.limit, self.remaining, self.reset_datetime = self.get_limit()
-        self.remaining -= 2
-        self.reset_datetime += dt.timedelta(seconds=2)
 
 
 
     def __str__(self) -> str:
-        return f"""
-        Owner/Org: {self.owner}
-        Repository: {self.repo}
-        API URL: {self.api_url}
-        Limit requests: {self.limit}
-        Remaining requests: {self.remaining}
-        Next Reset: {self.reset_datetime}
-        Last Stop: {self.last_stop_datetime}
-        SleepInterval: {self.sleep_betw_requests}
-        verbose: {self.verbose}""".replace("        ", "")
+        return '\n'.join([
+            f"Owner/Org: {self.owner}",
+            f"Repository: {self.repo}",
+            f"API URL: {self.api_url}",
+            f"Limit requests: {self.limit}",
+            f"Remaining requests: {self.remaining}",
+            f"Next Reset: {self.reset_datetime}",
+            f"Last Stop: {self.last_stop_datetime}",
+            f"SleepInterval: {self.sleep_betw_requests}",
+            f"verbose: {self.verbose}",
+            "_"*30, ""
+        ])
 
 
 
@@ -152,43 +147,35 @@ class GitHub():
         # 401 = 'Unauthorized'
         # 403 = 'rate limit exceeded'
 
-        # # handel limitation
-        if self.remaining <= 1:
-            self.last_stop_datetime = dt.datetime.now().replace(microsecond=0)
-            self.force_to_sleep = (self.reset_datetime - self.last_stop_datetime).seconds
-            # refetching the page when limit exceeded
-            self.page -= 1
+        self.last_stop_datetime = dt.datetime.now().replace(microsecond=0)
+        self.force_to_sleep = (self.reset_datetime - self.last_stop_datetime).seconds
 
-            if self.verbose:
-                print(f'Limit handler is triggered, program will sleep for approximately {self.force_to_sleep} seconds.')
+        # refetching the page when limit exceeded
+        self.page -= 1
 
-            # long sleep till limit reset
-            sleep(self.force_to_sleep)
+        self.limit_handler_counter += 1
 
-            self.limit, self.remaining, self.reset_datetime = self.get_limit()
-            self.remaining -= 2
-            self.reset_datetime += dt.timedelta(seconds=2)
+        if self.verbose:
+            print(f'Limit handler is triggered, program will sleep for approximately {self.force_to_sleep} seconds.')
 
-            if self.verbose:
-                print(f'Continue with {self.current_action} from page {self.page}...')
+        # long sleep till limit reset
+        sleep(self.force_to_sleep)
 
+        self.update_limit_handler()
+
+        if self.verbose:
+            print(f'Continue with {self.current_action} from page {self.page}...')
 
 
-        # if an hour passed and requests are not triggered, renew limit variables
-        if  (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
 
-            # update limit variables and error margin
-            self.limit, self.remaining, self.reset_datetime = self.get_limit()
-            self.remaining -= 2
-            self.reset_datetime += dt.timedelta(seconds=2)
+    def update_limit_handler(self):
+        # update limit variables and error margin
+        self.get_limit()
+        self.remaining -= 2
+        self.reset_datetime += dt.timedelta(seconds=2)
 
-            if self.verbose:
-                print(f'Update limit handler variables.')
-
-
-        # updating variables to deal with limits
-        self.total_requests += 1
-        self.remaining -= 1
+        if self.verbose:
+            print(f'Update limit handler variables.')
 
 
 
@@ -227,6 +214,8 @@ class GitHub():
 
         if basic_auth.status_code == 200:
 
+            self.is_authenticated = True
+
             basic_auth_json = basic_auth.json()
 
             if self.verbose:
@@ -235,12 +224,12 @@ class GitHub():
                 print(basic_auth_json['html_url'])
                 print('_'*60)
 
-            return True
         else:
             # 401 = 'Unauthorized'
             print(basic_auth.status_code)
             print(basic_auth.reason)
-            return False
+
+            self.is_authenticated = False
 
 
 
@@ -258,21 +247,20 @@ class GitHub():
 
         if response.status_code == 200:
             temp = response.json()['resources']['core']
-            remaining = temp["remaining"]
-            reset_datetime = dt.datetime.fromtimestamp(temp["reset"])
-            limit = temp["limit"]
+            self.remaining = temp["remaining"]
+            self.reset_datetime = dt.datetime.fromtimestamp(temp["reset"])
+            self.limit = temp["limit"]
 
             if verbose: # local verbose
-                print(f'Limit :{limit}')
+                print(f'Limit :{self.limit}')
                 print(f'Used :{temp["used"]}')
-                print(f'Remaining :{remaining}')
-                print(f'Reset :{reset_datetime}')
+                print(f'Remaining :{self.remaining}')
+                print(f'Reset :{self.reset_datetime}')
+                print("_"*30)
 
-            return limit, remaining, reset_datetime
         else:
             print(response.status_code)
             print(response.reason)
-            return False,  False
 
 
 
@@ -302,12 +290,19 @@ class GitHub():
                 print(response)
                 sys.exit(1)
 
+            # case 1: limit achieved and action was not fully fetched -> stopped while paginating
+            # case 2: got response but was last action page and last remaining the same time
+            # case 3: still remaining and last page was achieved -> jump to next action
+            # case 4: limit was not reached and an hour passed -> reset limit variables
+
+            # handel case: limit achieved and action was not fully fetched -> stopped while paginating
+            if response.status_code == 403:
+                self.limit_handler()
 
             # check if key is not empty
             response_JSON = response.json()
             if checker:
                 response_JSON = response_JSON.get(checker)
-
 
             if not response_JSON:
                 if self.verbose:
@@ -319,10 +314,9 @@ class GitHub():
             iter_save_path = save_path[:-5] + f'_{self.page}.json'
             self.save_JSON(response_JSON, iter_save_path)
 
-
-            # handel limit and error 403
-            self.limit_handler()
-
+            # handel case: got response but was last action page and last remaining the same time
+            if self.remaining <= 1:
+                self.limit_handler()
 
             # handel page incrementing
             github_url = github_url[:-len(f'&page={self.page}')]
@@ -330,6 +324,15 @@ class GitHub():
 
             # sleep between requests
             sleep(self.sleep_betw_requests)
+
+            # updating variables to deal with limits
+            self.total_requests += 1
+            self.remaining -= 1
+
+
+            # handel case: limit was not reached and an hour passed -> reset limit variables
+            if (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
+                self.update_limit_handler()
 
 
 
@@ -341,6 +344,7 @@ class GitHub():
         """
 
         self.current_action = 'repos'
+        self.page = 1
 
         url = self.actions_url['repos'].format(org=self.owner, per_page=self.per_page)
         github_url = self.api_url + url
@@ -352,6 +356,9 @@ class GitHub():
 
         self.paginating(github_url, None, save_path)
 
+        # *DEBUGGING
+        self.get_limit(verbose=True)
+
 
 
     def get_workflows(self, save_path: Optional[str] = None) -> None:
@@ -362,6 +369,7 @@ class GitHub():
         """
 
         self.current_action = 'workflows'
+        self.page = 1
 
         url = self.actions_url['workflows'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
         github_url = self.api_url + url
@@ -372,6 +380,9 @@ class GitHub():
             save_path = f'./data/workflows/{self.owner}_{self.repo}_workflows.json'
 
         self.paginating(github_url, 'workflows', save_path)
+
+        # *DEBUGGING
+        self.get_limit(verbose=True)
 
 
 
@@ -384,6 +395,7 @@ class GitHub():
         """
 
         self.current_action = 'runs'
+        self.page = 1
 
         url = self.actions_url['runs'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
         url += f'exclude_pull_requests={str(exclude_pull_requests)}'
@@ -396,35 +408,12 @@ class GitHub():
 
         self.paginating(github_url, 'workflow_runs', save_path)
 
-
-
-    def get_run_artifacts(self, run_id: Optional[int] = None, save_path: Optional[str] = None) -> None:
-        """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
-
-        Args:
-            run_id (Optional[int], optional): [description]. Defaults to None.
-            save_path (Optional[str], optional): [description]. Defaults to None.
-        """
-
-        if not run_id:
-            print('Please make to sure to pass both the owner and repo names.')
-            sys.exit(1)
-
-        self.current_action = 'artifacts'
-
-        url = self.actions_url['artifacts'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
-        github_url = self.api_url + url
-
-
-        # ?function to save documents to mongodb instead of save_path
-        if not save_path:
-            save_path = f'./data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
-
-        self.paginating(github_url, 'artifacts', save_path)
+        # *DEBUGGING
+        self.get_limit(verbose=True)
 
 
 
-    def get_run_jobs(self, run_id: Optional[int] = None, save_path: Optional[str] = None) -> None:
+    def get_jobs(self, run_id: Optional[int] = None, save_path: Optional[str] = None) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
@@ -437,6 +426,7 @@ class GitHub():
             sys.exit(1)
 
         self.current_action = 'jobs'
+        self.page = 1
 
         url = self.actions_url['jobs'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
         github_url = self.api_url + url
@@ -450,25 +440,49 @@ class GitHub():
 
 
 
-    def get_all(self, run_id: Optional[int] = None, save_path: Optional[str] = None) -> None:
+    def get_artifacts(self, run_id: Optional[int] = None, save_path: Optional[str] = None) -> None:
+        """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
-        # if not self.authenticate_user(verbose):
-        #     print("Wrong token, please try again.")
-        #     sys.exit(1)
+        Args:
+            run_id (Optional[int], optional): [description]. Defaults to None.
+            save_path (Optional[str], optional): [description]. Defaults to None.
+        """
 
-        # cls_GitHub.get_owner_repostries(owner, verbose=verbose)
+        if not run_id:
+            print('Please make to sure to pass both the owner and repo names.')
+            sys.exit(1)
 
-        # cls_GitHub.get_workflows(owner, repo, verbose=verbose)
+        self.current_action = 'artifacts'
+        self.page = 1
 
-        # cls_GitHub.get_runs(owner, repo, verbose=verbose)
+        url = self.actions_url['artifacts'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
+        github_url = self.api_url + url
 
-        # TODO function to loop over run ids
 
-        # cls_GitHub.get_run_jobs(owner, repo, verbose=verbose)
+        # ?function to save documents to mongodb instead of save_path
+        if not save_path:
+            save_path = f'./data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
 
-        # cls_GitHub.get_run_artifacts(owner, repo, verbose=verbose)
+        self.paginating(github_url, 'artifacts', save_path)
 
-        ...
+
+
+    def get_all(self, runs_object = None, ignore_authentication: bool = True, save_path: Optional[str] = None) -> None:
+
+        if not self.authenticate_user() and ignore_authentication:
+            print("Wrong token, please try again.")
+            sys.exit(1)
+
+        self.get_owner_repostries()
+        self.get_workflows()
+        self.get_runs()
+
+        # if Runs object was passed, for each Run get
+        if not runs_object:
+            for run in runs_object.objects():
+                self.get_jobs(run.id)
+                self.get_artifacts(run.id)
+
 
 
 
@@ -484,12 +498,8 @@ if __name__ == '__main__':
     repo_name = 'commons-lang'
 
     cls_GitHub = GitHub(owner=owner_name, repo=repo_name, env_variable='GITHUB_Token', verbose=True)
-    # print(cls_GitHub)
-    # cls_GitHub.authenticate_user()
+    print(cls_GitHub)
 
-    # cls_GitHub.get_owner_repostries()
-    cls_GitHub.get_workflows()
-    # cls_GitHub.get_runs()
-    # cls_GitHub.get_all()
+    cls_GitHub.get_all(ignore_authentication=False)
 
     cls_GitHub.get_limit(verbose=True)
