@@ -286,8 +286,7 @@ class GitHub():
                 break
 
             # ?function to save documents to mongodb
-            for obj in response_JSON:
-                self.save_mongo(obj, self.current_action)
+            self.save_mongo(response_JSON, self.current_action)
 
             # *DEBUGGING
             self.save_JSON(response_JSON, save_path)

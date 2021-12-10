@@ -2,13 +2,14 @@ import os
 import json
 import datetime as dt
 import github as gh
-
+from typing import Optional
 
 from mongoengine import connect
 import pycoshark.utils as utils
 
 
 class Repositories(utils.Document):
+    # to remove after finding the similar one in smartShark
     meta = {
         'collection': 'repositories'
     }
@@ -27,6 +28,23 @@ class Repositories(utils.Document):
     visibility = utils.StringField()
     topics = utils.ListField( utils.StringField() )
 
+    def __str__(self):
+        return '\n'.join([
+            f'id : {self.id}',
+            f'name : {self.name}',
+            f'description : {self.description}',
+            f'fork : {self.fork}',
+            f'forks_count : {self.forks_count}',
+            f'size : {self.size}',
+            f'created_at : {self.created_at}',
+            f'updated_at : {self.updated_at}',
+            f'pushed_at : {self.pushed_at}',
+            f'stargazers_count : {self.stargazers_count}',
+            f'watchers_count : {self.watchers_count}',
+            f'open_issues : {self.open_issues}',
+            f'visibility : {self.visibility}',
+            f'topics : {self.topics}'
+        ])
 
 
 class Workflows(utils.Document):
@@ -41,7 +59,14 @@ class Workflows(utils.Document):
     updated_at = utils.DateTimeField(default=None)
 
     def __str__(self):
-        return f'id : {self.id}\nname : {self.name}\npath : {self.path}\nstate : {self.state}\ncreated_at : {self.created_at}\nupdated_at : {self.updated_at}'
+        return '\n'.join([
+            f'id : {self.id}',
+            f'name : {self.name}',
+            f'path : {self.path}',
+            f'state : {self.state}',
+            f'created_at : {self.created_at}',
+            f'updated_at : {self.updated_at}'
+        ])
 
 
 
@@ -64,6 +89,23 @@ class Runs(utils.Document):
     head_commit =  utils.DictField()
     head_repository =  utils.DictField()
 
+    def __str__(self):
+        return '\n'.join([
+            f'id : {self.id}',
+            f'name : {self.name}',
+            f'run_number : {self.run_number}',
+            f'event : {self.event}',
+            f'status : {self.status}',
+            f'conclusion : {self.conclusion}',
+            f'workflow_id : {self.workflow_id}',
+            f'created_at : {self.created_at}',
+            f'updated_at : {self.updated_at}',
+            f'run_attempt : {self.run_attempt}',
+            f'run_started_at : {self.run_started_at}',
+            f'head_commit : {self.head_commit}',
+            f'head_repository : {self.head_repository}'
+        ])
+
 
 
 class Jobs(utils.Document):
@@ -84,6 +126,21 @@ class Jobs(utils.Document):
     runner_group_id = utils.IntField()
     runner_group_name = utils.StringField()
 
+    def __str__(self):
+        return '\n'.join([
+            f'id : {self.id}',
+            f'name : {self.name}',
+            f'run_id : {self.run_id}',
+            f'run_attempt : {self.run_attempt}',
+            f'status : {self.status}',
+            f'conclusion : {self.conclusion}',
+            f'started_at : {self.started_at}',
+            f'completed_at : {self.completed_at}',
+            f'runner_id : {self.runner_id}',
+            f'runner_name : {self.runner_name}',
+            f'runner_group_id : {self.runner_group_id}',
+            f'runner_group_name : {self.runner_group_name}'
+        ])
 
 
 class Artifacts(utils.Document):
@@ -99,7 +156,17 @@ class Artifacts(utils.Document):
     updated_at = utils.DateTimeField(default=None)
     expires_at = utils.DateTimeField(default=None)
 
-
+    def __str__(self):
+        return '\n'.join([
+            f'id : {self.id}',
+            f'name : {self.name}',
+            f'size_in_bytes : {self.size_in_bytes}',
+            f'archive_download_url : {self.archive_download_url}',
+            f'expired : {self.expired}',
+            f'created_at : {self.created_at}',
+            f'updated_at : {self.updated_at}',
+            f'expires_at : {self.expires_at}'
+        ])
 
 class Mongo:
     __conn_uri = utils.create_mongodb_uri_string(db_user=None, db_password=None, db_hostname='localhost', db_port=27017, db_authentication_database=None, db_ssl_enabled=False)
@@ -107,25 +174,45 @@ class Mongo:
 
     def __init__(self, db_name: str = 'actionshark') -> None:
         self.__operations = {
-            'save_workflows': ('workflows', self.__create_mongo_workflow),
-            'save_repositories': (None, self.__create_mongo_repo),
-            'save_runs': ('workflow_runs', self.__create_mongo_run),
-            'save_jobs': ('jobs', self.__create_mongo_job),
-            'save_artifacts': ('artifacts', self.__create_mongo_artifact)
+            'repos': self.__create_mongo_repo,
+            'workflows': self.__create_mongo_workflow,
+            'runs': self.__create_mongo_run,
+            'jobs': self.__create_mongo_job,
+            'artifacts': self.__create_mongo_artifact
         }
+
         connect(db_name, host=self.__conn_uri)
 
 
 
-    def insert_JSON(self, file_path: str = None, operation: str = None):
+    def save_documents(self, documents: Optional[dict] = None, action: Optional[str] = None) -> None:
 
-        if not file_path or not operation : return None
+        if not documents or not action:
+            return None
+
+        if action not in self.__operations.keys():
+            return None
+
+        func = self.__operations[action]
+
+        for document in documents:
+                func(document).save()
 
 
+    # *DEBUGGING
+    def insert_JSON(self, file_path: Optional[str] = None, operation: Optional[str] = None) -> None:
+
+        if not file_path or not operation:
+            return None
+
+        # load the action function
         if operation in self.__operations.keys():
-            key, func = self.__operations[operation]
-        else: return None
+            func = self.__operations[operation]
+        else:
+            return None
 
+
+        # add all files to a list
         if not file_path.split('.')[-1] == 'json':
             if file_path[-1] != '/': file_path += '/'
             files = [file_path + f for f in os.listdir(file_path)]
@@ -133,18 +220,17 @@ class Mongo:
             files = [file_path]
 
 
+        # loop over all files in a directory
         for file in files:
             with open( file, 'r', encoding='utf-8') as data:
                 documents = json.load(data)
-
-            if key: documents = documents[key]
 
             for document in documents:
                 func(document).save()
 
 
 
-    def __create_mongo_repo(self, obj: json = None):
+    def __create_mongo_repo(self, obj: Optional[dict] = None) -> Repositories:
         if not obj: return None
 
         repo = Repositories()
@@ -168,7 +254,7 @@ class Mongo:
 
 
 
-    def __create_mongo_workflow(self, obj: json = None):
+    def __create_mongo_workflow(self, obj: Optional[dict] = None) -> Workflows:
         if not obj: return None
 
         workflow = Workflows()
@@ -184,7 +270,7 @@ class Mongo:
 
 
 
-    def __create_mongo_run(self, obj: json = None):
+    def __create_mongo_run(self, obj: Optional[dict] = None) -> Runs:
         if not obj: return None
 
         run = Runs()
@@ -208,7 +294,7 @@ class Mongo:
 
 
 
-    def __create_mongo_job(self, obj: json = None):
+    def __create_mongo_job(self, obj: Optional[dict] = None) -> Jobs:
         if not obj: return None
 
         job = Jobs()
@@ -231,7 +317,7 @@ class Mongo:
 
 
 
-    def __create_mongo_artifact(self, obj: json = None):
+    def __create_mongo_artifact(self, obj: Optional[dict] = None) -> Artifacts:
         if not obj: return None
 
         artifact = Artifacts()
@@ -251,21 +337,11 @@ class Mongo:
 if __name__ == '__main__':
 
     cls_mongo = Mongo()
-    # cls_mongo.insert_JSON('./data/workflows/apache_commons-lang_workflows_1.json', 'save_workflows')
-    # cls_mongo.insert_JSON('./data/repositories', 'save_repositories')
-    # cls_mongo.insert_JSON('./data/runs', 'save_runs')
-    # cls_mongo.insert_JSON('./data/jobs', 'save_jobs')
-    # cls_mongo.insert_JSON('./data/artifacts', 'save_artifacts')
+    # cls_mongo.insert_JSON('./data/workflows', 'workflows')
+    # cls_mongo.insert_JSON('./data/repositories', 'repositories')
+    # cls_mongo.insert_JSON('./data/runs', 'runs')
+    # cls_mongo.insert_JSON('./data/jobs', 'jobs')
+    # cls_mongo.insert_JSON('./data/artifacts', 'artifacts')
 
-
-
-    # cls_github = gh.GitHub(env_variable = 'GITHUB_Token')
-
-    # cls_github.get_limit()
-
-    # owner_name = 'apache'
-    # repo_name = 'commons-lang'
-    # for i, r in enumerate(Runs.objects()):
-    #     cls_github.get_run_artifacts(owner_name, repo_name, r.id, verbose=True) # not a single artifact found
-
-    # cls_github.get_limit()
+    # for obj in Runs.objects():
+    #    print(obj.id)
