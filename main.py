@@ -4,6 +4,8 @@ import sys
 import pycoshark.utils as utils
 from actionshark.config import Config
 from actionshark.actionshark import Actions
+from actionshark.mongo import Mongo
+from actionshark.github import GitHub
 
 def collect_args():
     # parser = get_base_argparser('Collects information from command line.', '0.0.1')
@@ -20,6 +22,11 @@ def collect_args():
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
 
     return parser.parse_args()
+
+
+def main(cfg):
+    mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.ssl)
+    github = GitHub()
 
 
 if __name__ == "__main__":
