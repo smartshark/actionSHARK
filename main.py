@@ -20,10 +20,10 @@ def collect_args():
     parser = utils.get_base_argparser('Collects information from command line.', '0.0.1')
 
     # GitHub Args
-    parser.add_argument('-t', '--token', help='', required=False, type=str)
-    parser.add_argument('-env', '--token-env', help='', required=False, type=str)
-    parser.add_argument('-o', '--owner', help='', required=True, type=str)
-    parser.add_argument('-r', '--repository', help='', required=True, type=str)
+    parser.add_argument('-t', '--token', help='GitHub token to authenticate user.', required=False, type=str)
+    parser.add_argument('-env', '--token-env', help='Environment variable, where token is stored.', required=False, type=str)
+    parser.add_argument('-o', '--owner', help='Owner name of the repository.', required=True, type=str)
+    parser.add_argument('-r', '--repository', help='Repository Name.', required=True, type=str)
 
     # General
     parser.add_argument('--debug', help='Sets the debug level.', default='DEBUG',
@@ -58,6 +58,7 @@ def main(cfg, verbose: bool = False):
 
 
 if __name__ == "__main__":
+
     # collect args from terminal
     args = collect_args()
 
@@ -66,3 +67,5 @@ if __name__ == "__main__":
 
     # handel github and mongodb side
     main(cls_config)
+
+    ...
