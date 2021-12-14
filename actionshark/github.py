@@ -21,9 +21,9 @@ class GitHub():
     actions_url = {
         'repos': 'orgs/{org}/repos?per_page={per_page}',
         'workflows': 'repos/{owner}/{repo}/actions/workflows?per_page={per_page}',
-        'runs': 'repos/{owner}/{repo}/actions/runs?per_page{per_page}',
-        'jobs': 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page{per_page}',
-        'artifacts': 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page{per_page}'
+        'runs': 'repos/{owner}/{repo}/actions/runs?per_page={per_page}',
+        'jobs': 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page={per_page}',
+        'artifacts': 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page={per_page}'
     }
 
     total_requests = 0
@@ -466,7 +466,7 @@ class GitHub():
         else:
             logger.debug(f'proceding without token')
 
-        # self.get_owner_repostries()
+        self.get_owner_repostries()
         self.get_workflows()
         self.get_runs()
 
