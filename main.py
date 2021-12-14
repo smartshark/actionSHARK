@@ -3,7 +3,6 @@ import sys
 
 import pycoshark.utils as utils
 from actionshark.config import Config
-from actionshark.actionshark import Actions
 from actionshark.mongo import Mongo
 from actionshark.github import GitHub
 
@@ -24,12 +23,12 @@ def collect_args():
 
 
 
-def main(cfg):
+def main(cfg, verbose: bool = False):
     # initiate mongo instance
     mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.db_ssl)
 
     # initiate GitHub instance
-    github = GitHub(owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents, verbose=True)
+    github = GitHub(owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents, verbose=verbose)
 
     # get all actions
     github.run( mongo.run_object() )
