@@ -43,7 +43,8 @@ class Config:
             f'db_hostname: {self.db_hostname}',
             f'db_port: {self.db_port}',
             f'db_authentication: {self.db_authentication}',
-            f'db_ssl: {self.db_ssl}'
+            f'db_ssl: {self.db_ssl}',
+            f'verbose: {self.verbose}'
         ])
 
 

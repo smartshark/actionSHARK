@@ -26,7 +26,7 @@ def collect_args():
     parser.add_argument('-env', '--token-env', help='Environment variable, where token is stored.', required=False, type=str)
     parser.add_argument('-o', '--owner', help='Owner name of the repository.', required=True, type=str)
     parser.add_argument('-r', '--repository', help='Repository Name.', required=True, type=str)
-    parser.add_argument('-ver', '--verbose', help='True, if print out extra messages to the console', required=False, default=False, type=str)
+    parser.add_argument('-ver', '--verbose', help='True, if print out extra messages to the console', required=False, default=False, type=bool)
 
     # General
     parser.add_argument('--debug', help='Sets the debug level.', default='DEBUG',
@@ -48,7 +48,10 @@ def main(cfg, verbose: bool = False):
     logger.debug('Start Logging')
 
     # initiate mongo instance
-    mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.db_ssl)
+    mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.db_ssl, verbose=cfg.verbose)
+
+    # *DEBUGGING
+    mongo.drop_collection()
 
     # initiate GitHub instance
     github = GitHub(owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents, verbose=cfg.verbose)

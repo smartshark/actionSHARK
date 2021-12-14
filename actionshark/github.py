@@ -466,7 +466,7 @@ class GitHub():
         else:
             logger.debug(f'proceding without token')
 
-        self.get_owner_repostries()
+        # self.get_owner_repostries()
         self.get_workflows()
         self.get_runs()
 

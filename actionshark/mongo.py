@@ -328,8 +328,8 @@ class Mongo:
         workflow.name = obj.get('name')
         workflow.path = obj.get('path')
         workflow.state = obj.get('state')
-        workflow.created_at = dt.datetime.fromisoformat( obj.get('created_at') )
-        workflow.updated_at = dt.datetime.fromisoformat( obj.get('updated_at') )
+        workflow.created_at = dt.datetime.strptime( obj.get('created_at')[:-5], '%Y-%m-%dT%H:%M:%S' )
+        workflow.updated_at = dt.datetime.strptime( obj.get('updated_at')[:-5], '%Y-%m-%dT%H:%M:%S' )
 
         return workflow
 
