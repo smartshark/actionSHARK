@@ -20,6 +20,7 @@ class Config:
         self.db_authentication = args.db_authentication
         self.db_ssl = args.ssl
         self.logger_level = self.get_logger_level(args.debug)
+        self.verbose = args.verbose
 
         # if environment variable passed and not concrete token
         if not self.token and args.token_env:

@@ -15,6 +15,7 @@ class GitHub():
     Managing different type of get Request to fetch data from GitHub REST API"""
 
     api_url = 'https://api.github.com/'
+
     __headers = {'Accept': 'application/vnd.github.v3+json'}
 
     actions_url = {
@@ -304,9 +305,6 @@ class GitHub():
             # updating variables to deal with limits
             self.total_requests += 1
             self.remaining -= 1
-
-            # *DEBUGGING
-            print(f'Remaining: {self.remaining}')
 
 
             # handel case: limit was not reached and an hour passed -> reset limit variables

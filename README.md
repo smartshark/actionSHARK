@@ -12,7 +12,7 @@ Actions in GitHub are divided to workflows, runs, jobs, and artifacts.
 ### __How to Run__:
 Simple quick run for a local MongoDB:
 <br />
-`python main.py -t [token] -o [owner] -r [repository] -DB [database]`
+`python main.py -o [owner] -r [repository]`
 <br />
 <br />
 
