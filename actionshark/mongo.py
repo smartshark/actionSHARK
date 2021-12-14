@@ -306,9 +306,9 @@ class Mongo:
         repo.fork = bool( obj.get('fork') )
         repo.forks_count = int( obj.get('forks_count') )
         repo.size = int( obj.get('size') )
-        repo.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%SZ' )
-        repo.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%SZ' )
-        repo.pushed_at = dt.datetime.strptime( obj.get('pushed_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        repo.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%S%z' )
+        repo.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%S%z' )
+        repo.pushed_at = dt.datetime.strptime( obj.get('pushed_at'), '%Y-%m-%dT%H:%M:%S%z' )
         repo.stargazers_count = int( obj.get('stargazers_count') )
         repo.watchers_count = int( obj.get('watchers_count') )
         repo.open_issues = int( obj.get('open_issues') )
@@ -328,8 +328,8 @@ class Mongo:
         workflow.name = obj.get('name')
         workflow.path = obj.get('path')
         workflow.state = obj.get('state')
-        workflow.created_at = dt.datetime.strptime( obj.get('created_at')[:-5], '%Y-%m-%dT%H:%M:%S' )
-        workflow.updated_at = dt.datetime.strptime( obj.get('updated_at')[:-5], '%Y-%m-%dT%H:%M:%S' )
+        workflow.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%S.%f%z' )
+        workflow.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%S.%f%z' )
 
         return workflow
 
@@ -348,8 +348,8 @@ class Mongo:
         run.conclusion = obj.get('conclusion')
         run.workflow_id = int( obj.get('workflow_id') )
         run.pull_requests = obj.get('pull_requests')
-        run.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%SZ' )
-        run.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        run.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%S%z' )
+        run.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%S%z' )
         run.run_attempt = int( obj.get('run_attempt') )
         run.run_started_at = obj.get('run_started_at')
         run.head_commit = obj.get('head_commit')
@@ -370,8 +370,8 @@ class Mongo:
         job.run_attempt = int( obj.get('run_attempt') )
         job.status = obj.get('status')
         job.conclusion = obj.get('conclusion')
-        job.started_at = dt.datetime.strptime( obj.get('started_at'), '%Y-%m-%dT%H:%M:%SZ' ) if obj.get('started_at') else None
-        job.completed_at = dt.datetime.strptime( obj.get('completed_at'), '%Y-%m-%dT%H:%M:%SZ' ) if obj.get('completed_at') else None
+        job.started_at = dt.datetime.strptime( obj.get('started_at'), '%Y-%m-%dT%H:%M:%S%z' ) if obj.get('started_at') else None
+        job.completed_at = dt.datetime.strptime( obj.get('completed_at'), '%Y-%m-%dT%H:%M:%S%z' ) if obj.get('completed_at') else None
         job.steps = obj.get('steps')
         job.runner_id = int( obj.get('runner_id') ) if obj.get('runner_id') else None
         job.runner_name = obj.get('runner_name')
@@ -392,9 +392,9 @@ class Mongo:
         artifact.size_in_bytes = int( obj.get('size_in_bytes') )
         artifact.archive_download_url = obj.get('archive_download_url')
         artifact.expired = bool( obj.get('expired') )
-        artifact.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%SZ' )
-        artifact.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%SZ' )
-        artifact.expires_at = dt.datetime.strptime( obj.get('expires_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        artifact.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%S%z' )
+        artifact.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%S%z' )
+        artifact.expires_at = dt.datetime.strptime( obj.get('expires_at'), '%Y-%m-%dT%H:%M:%S%z' )
 
         return artifact
 
