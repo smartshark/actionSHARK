@@ -397,17 +397,3 @@ class Mongo:
         artifact.expires_at = dt.datetime.strptime( obj.get('expires_at'), '%Y-%m-%dT%H:%M:%S%z' )
 
         return artifact
-
-
-
-if __name__ == '__main__':
-
-    # cls_mongo = Mongo(db_name='actionshark', db_hostname='localhost', db_port=27017)
-
-    # cls_mongo.insert_JSON('./data/workflows', 'workflows')
-
-    # cls_github = GitHub(owner='apache', repo='commons-lang', token=os.environ.get('GITHUB_Token'), save_mongo=cls_mongo.save_documents)
-
-    # cls_github.get_jobs(run_id=1230131767)
-
-    ...

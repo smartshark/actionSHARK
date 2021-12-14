@@ -36,7 +36,7 @@ def collect_args():
 
 
 
-def main(cfg, verbose: bool = False):
+def main(cfg):
 
     # initializing logger
     logger = logging.getLogger("actionshark")
@@ -51,7 +51,7 @@ def main(cfg, verbose: bool = False):
     mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.db_ssl, verbose=cfg.verbose)
 
     # *DEBUGGING
-    mongo.drop_collection()
+    mongo.drop_database()
 
     # initiate GitHub instance
     github = GitHub(owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents, verbose=cfg.verbose)

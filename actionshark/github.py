@@ -106,12 +106,12 @@ class GitHub():
 
         if basic_auth.status_code == 200:
 
-            logger.debug(f'successfully authenticated using token')
+            logger.debug(f'Successfully authenticated using token')
 
             basic_auth_json = basic_auth.json()
 
             if verbose:
-                print('Successful Request:', basic_auth.status_code)
+                print('Successful Authentication:', basic_auth.status_code)
                 print(basic_auth_json['name'])
                 print(basic_auth_json['html_url'])
                 print('_'*60)
@@ -120,9 +120,11 @@ class GitHub():
 
         else:
 
+            logger.debug(f'Error authenticated using token')
+
             if verbose:
                 # 401 = 'Unauthorized'
-                print(basic_auth.status_code)
+                print('Error Authentication:', basic_auth.status_code)
                 print(basic_auth.reason)
                 print(self.api_url + 'user')
 
@@ -162,7 +164,7 @@ class GitHub():
             self.remaining = 0
             self.reset_datetime = self.get_dt_now()
 
-            print(response.status_code)
+            print('Error getting limit and quota', response.status_code)
             print(response.reason)
 
 
@@ -184,7 +186,8 @@ class GitHub():
 
         if self.verbose:
             print('\\\\'*40)
-            print(f'Limit handler is triggered, program will sleep for approximately {self.force_to_sleep:n} seconds.')
+            print(f'Limit handler is triggered')
+            print(f'Program will sleep for approximately {self.force_to_sleep:n} seconds.')
             print(f'Next Restart will be on {self.reset_datetime.time()}')
             print('//'*40)
 
@@ -222,7 +225,7 @@ class GitHub():
         logger.debug(f'Finished limit handler variables')
 
         if self.verbose:
-            print(f'Update limit handler variables.')
+            print(f'-- Update limit handler variables.')
 
 
 
@@ -248,7 +251,7 @@ class GitHub():
             response = requests.get(github_url, headers=self.__headers)
 
             if self.verbose:
-                print('GitHub API URL:', github_url)
+                print(f'GitHub {self.current_action}:', github_url)
 
             # Abort if unknown error occurred
             if response.status_code != 200 and response.status_code != 403:
@@ -279,7 +282,7 @@ class GitHub():
             if not response_JSON:
                 if self.verbose:
                     print(f'Response is Empty ... Stopping.')
-                    print('NEXT ACTION:','> > '*10 ,'\n')
+                    print('-'*len(github_url))
                 break
 
             # save documents to mongodb
@@ -292,7 +295,7 @@ class GitHub():
             if response_count < self.per_page:
                 if self.verbose:
                     print(f'Full Response is saved ... Stopping.')
-                    print('NEXT ACTION:','> > '*10 ,'\n')
+                    print('-'*len(github_url))
                 break
 
             # handel page incrementing
@@ -336,6 +339,9 @@ class GitHub():
 
         logger.debug(f'start fetching repositories')
 
+        if self.verbose:
+            print('-'*( len(github_url)+10) )
+
         self.paginating(github_url, None, save_path)
 
         logger.debug(f'finish fetching repositories')
@@ -359,6 +365,9 @@ class GitHub():
             save_path = f'./actionshark/data/workflows/{self.owner}_{self.repo}_workflows.json'
 
         logger.debug(f'start fetching workflows')
+
+        if self.verbose:
+            print('-'*( len(github_url)+10) )
 
         self.paginating(github_url, 'workflows', save_path)
 
@@ -386,6 +395,9 @@ class GitHub():
             save_path = f'./actionshark/data/runs/{self.owner}_{self.repo}_runs.json'
 
         logger.debug(f'start fetching runs')
+
+        if self.verbose:
+            print('-'*( len(github_url)+10) )
 
         self.paginating(github_url, 'workflow_runs', save_path)
 
@@ -417,6 +429,9 @@ class GitHub():
 
         logger.debug(f'start fetching jobs')
 
+        if self.verbose:
+            print('-'*( len(github_url)+10) )
+
         self.paginating(github_url, 'jobs', save_path)
 
         logger.debug(f'finish fetching jobs')
@@ -446,6 +461,9 @@ class GitHub():
             save_path = f'./actionshark/data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
 
         logger.debug(f'start fetching artifacts')
+
+        if self.verbose:
+            print('-'*( len(github_url)+10) )
 
         self.paginating(github_url, 'artifacts', save_path)
 
@@ -525,22 +543,3 @@ class GitHub():
         if self.verbose:
             print(f'Response is saved in: {save_path}')
             print('__'*len(save_path))
-
-
-
-
-if __name__ == '__main__':
-
-    # owner_name = 'freeCodeCamp'
-    # repo_name = 'freeCodeCamp'
-    # run_id = 1511226364
-    # run_id = 1514809363
-
-
-    # owner_name = 'apache'
-    # repo_name = 'commons-lang'
-
-    # cls_GitHub = GitHub(owner=owner_name, repo=repo_name, env_variable='GITHUB_Token', debug_mode=True, verbose=True)
-
-
-    ...
