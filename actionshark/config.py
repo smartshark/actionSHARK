@@ -22,7 +22,7 @@ class Config:
         self.logger_level = self.get_logger_level(args.debug)
 
         # if environment variable passed and not concrete token
-        if not self.token:
+        if not self.token and args.token_env:
             self.token = os.environ.get(args.token_env)
 
 
