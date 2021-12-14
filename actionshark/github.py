@@ -5,8 +5,10 @@ import os
 import sys
 import datetime as dt
 import requests
+import logging
 
-
+# start logger
+logger = logging.getLogger(__name__)
 
 class GitHub():
     """
@@ -47,7 +49,8 @@ class GitHub():
 
         # check owner and repo
         if not owner or not repo or not save_mongo:
-            print('Please make to sure to pass both the owner and repo names.')
+            logger.debug(f'not all owner and repo names and save_mongo function was passed')
+            print('Please make to sure to pass owner and repo names and save_mongo function.')
             sys.exit(1)
 
         # add token to header and check initial quota
@@ -101,6 +104,8 @@ class GitHub():
         self.remaining -= 1
 
         if basic_auth.status_code == 200:
+
+            logger.debug(f'successfully authenticated using token')
 
             basic_auth_json = basic_auth.json()
 
@@ -182,11 +187,16 @@ class GitHub():
             print(f'Next Restart will be on {self.reset_datetime.time()}')
             print('//'*40)
 
+        logger.debug(f'Limit handler is triggered, program will sleep for approximately {self.force_to_sleep:n} seconds.')
+        logger.debug(f'Next Restart will be on {self.reset_datetime.time()}')
+
         # long sleep till limit reset
         sleep(self.force_to_sleep)
 
         # update limit variables
         self.update_limit_variables()
+
+        logger.debug(f'Continue with {self.current_action} from page {self.page}')
 
         if self.verbose:
             print('\\\\'*40)
@@ -203,6 +213,12 @@ class GitHub():
         self.get_limit()
         self.remaining -= 2
         self.reset_datetime += dt.timedelta(seconds=2)
+
+        logger.debug(f'Updating limit handler variables')
+        logger.debug(f'limit variable remaining: {self.remaining}')
+        logger.debug(f'limit variable reset_datetime: {self.reset_datetime}')
+        logger.debug(f'limit variable limit: {self.limit}')
+        logger.debug(f'Finished limit handler variables')
 
         if self.verbose:
             print(f'Update limit handler variables.')
@@ -235,6 +251,10 @@ class GitHub():
 
             # Abort if unknown error occurred
             if response.status_code != 200 and response.status_code != 403:
+
+                logger.debug(f'Error in request status_code: {response.status_code}')
+                logger.debug(f'Error in request github_url: {github_url}')
+
                 print("Error in request.")
                 print(response.status_code)
                 print(response)
@@ -261,7 +281,7 @@ class GitHub():
                     print('NEXT ACTION:','> > '*10 ,'\n')
                 break
 
-            # ?function to save documents to mongodb
+            # save documents to mongodb
             self.save_mongo(response_JSON, self.current_action)
 
             # *DEBUGGING
@@ -316,8 +336,11 @@ class GitHub():
         if not save_path:
             save_path = f'./actionshark/data/repositories/{self.owner}_repos.json'
 
+        logger.debug(f'start fetching repositories')
+
         self.paginating(github_url, None, save_path)
 
+        logger.debug(f'finish fetching repositories')
 
 
     def get_workflows(self, save_path: Optional[str] = None) -> None:
@@ -337,7 +360,11 @@ class GitHub():
         if not save_path:
             save_path = f'./actionshark/data/workflows/{self.owner}_{self.repo}_workflows.json'
 
+        logger.debug(f'start fetching workflows')
+
         self.paginating(github_url, 'workflows', save_path)
+
+        logger.debug(f'finish fetching workflows')
 
 
 
@@ -360,7 +387,11 @@ class GitHub():
         if not save_path:
             save_path = f'./actionshark/data/runs/{self.owner}_{self.repo}_runs.json'
 
+        logger.debug(f'start fetching runs')
+
         self.paginating(github_url, 'workflow_runs', save_path)
+
+        logger.debug(f'finish fetching runs')
 
 
 
@@ -386,7 +417,11 @@ class GitHub():
         if not save_path:
             save_path = f'./actionshark/data/jobs/{self.owner}_{self.repo}_run_{run_id}_jobs.json'
 
+        logger.debug(f'start fetching jobs')
+
         self.paginating(github_url, 'jobs', save_path)
+
+        logger.debug(f'finish fetching jobs')
 
 
 
@@ -412,23 +447,32 @@ class GitHub():
         if not save_path:
             save_path = f'./actionshark/data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
 
+        logger.debug(f'start fetching artifacts')
+
         self.paginating(github_url, 'artifacts', save_path)
+
+        logger.debug(f'finish fetching artifacts')
 
 
 
     def run(self, runs_object = None) -> None:
 
         # verify correct token if any
-        if self.token:
+        if 'Authorization' in self.__headers.keys():
             if not self.authenticate_user(verbose=True):
+
+                logger.debug(f'Wrong token')
+
                 print("Wrong token, please try again.")
                 sys.exit(1)
+        else:
+            logger.debug(f'proceding without token')
 
         self.get_owner_repostries()
         self.get_workflows()
         self.get_runs()
 
-        # # if Runs object was passed, for each Run get
+        # if Runs object was passed, for each Run get
         if runs_object:
 
             for run in runs_object.objects():

@@ -1,10 +1,20 @@
 import os
 import sys
+import logging
 
 import pycoshark.utils as utils
 from actionshark.config import Config
 from actionshark.mongo import Mongo
 from actionshark.github import GitHub
+
+
+# logger configuration
+logging.basicConfig(
+    filename="logs/actionshark.log",
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%d/%m/%Y %H:%M:%S"
+    )
+
 
 def collect_args():
     parser = utils.get_base_argparser('Collects information from command line.', '0.0.1')
@@ -24,6 +34,16 @@ def collect_args():
 
 
 def main(cfg, verbose: bool = False):
+
+    # initializing logger
+    logger = logging.getLogger("actionshark")
+
+    # set logging level
+    logger.setLevel( cfg.logger_level )
+
+    # Start logger message
+    logger.debug('Start Logging')
+
     # initiate mongo instance
     mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.db_ssl)
 
@@ -31,7 +51,10 @@ def main(cfg, verbose: bool = False):
     github = GitHub(owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents, verbose=verbose)
 
     # get all actions
-    github.run( mongo.run_object() )
+    github.run( mongo.runs )
+
+    # Finish logging message
+    logger.debug('Finish Logging')
 
 
 if __name__ == "__main__":

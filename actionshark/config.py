@@ -1,4 +1,8 @@
 import os
+import logging
+
+# start logger
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -15,13 +19,15 @@ class Config:
         self.db_port = args.db_port
         self.db_authentication = args.db_authentication
         self.db_ssl = args.ssl
-        self.debug = args.debug
+        self.logger_level = self.get_logger_level(args.debug)
 
         # if environment variable passed and not concrete token
         if not self.token:
             self.token = os.environ.get(args.token_env)
 
-        # self._validate_config()
+
+        logger.debug('Arguments mapped')
+
 
 
 
@@ -41,5 +47,19 @@ class Config:
 
 
 
-    def _validate_config(self):
-        pass
+    def get_logger_level(self, level: str = 'debug'):
+
+        levels = {
+            'DEBUG': logging.DEBUG,
+            'INFO': logging.INFO,
+            'WARNING': logging.WARNING,
+            'ERROR': logging.ERROR,
+            'CRITICAL': logging.CRITICAL
+        }
+
+        if level in levels.keys():
+            return levels[level]
+        else:
+            logger.debug("logging level not declared.")
+            return None
+
