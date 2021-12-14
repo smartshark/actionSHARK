@@ -251,7 +251,7 @@ class GitHub():
             response = requests.get(github_url, headers=self.__headers)
 
             if self.verbose:
-                print(f'GitHub {self.current_action}:', github_url)
+                print(f'{self.current_action} url:', github_url)
 
             # Abort if unknown error occurred
             if response.status_code != 200 and response.status_code != 403:
@@ -282,7 +282,7 @@ class GitHub():
             if not response_JSON:
                 if self.verbose:
                     print(f'Response is Empty ... Stopping.')
-                    print('-'*len(github_url))
+                    print('-'*( len(github_url)+10) )
                 break
 
             # save documents to mongodb
@@ -427,14 +427,11 @@ class GitHub():
         if not save_path:
             save_path = f'./actionshark/data/jobs/{self.owner}_{self.repo}_run_{run_id}_jobs.json'
 
-        logger.debug(f'start fetching jobs')
-
         if self.verbose:
             print('-'*( len(github_url)+10) )
 
         self.paginating(github_url, 'jobs', save_path)
 
-        logger.debug(f'finish fetching jobs')
 
 
 
@@ -460,14 +457,10 @@ class GitHub():
         if not save_path:
             save_path = f'./actionshark/data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
 
-        logger.debug(f'start fetching artifacts')
-
         if self.verbose:
             print('-'*( len(github_url)+10) )
 
         self.paginating(github_url, 'artifacts', save_path)
-
-        logger.debug(f'finish fetching artifacts')
 
 
 
@@ -490,12 +483,17 @@ class GitHub():
 
         # if Runs object was passed, for each Run get
         if runs_object:
-
+            # logger is used here to not log each time the function excutes
+            logger.debug(f'start fetching jobs')
             for run in runs_object.objects():
                 self.get_jobs(run.id)
+            logger.debug(f'finish fetching jobs')
 
+
+            logger.debug(f'start fetching artifacts')
             for run in runs_object.objects():
                 self.get_artifacts(run.id)
+            logger.debug(f'finish fetching artifacts')
 
 
 
