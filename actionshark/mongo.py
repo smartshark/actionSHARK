@@ -174,7 +174,7 @@ class Artifacts(utils.Document):
 
 class Mongo:
 
-    def __init__(self, db_user: Optional[str] = None, db_password: Optional[str] = None, db_hostname: Optional[str] = None, db_port: Optional[int] = None, db_name: Optional[str] = None, db_authentication_database: Optional[str] = None, db_ssl_enabled: bool = False) -> None:
+    def __init__(self, db_user: Optional[str] = None, db_password: Optional[str] = None, db_hostname: Optional[str] = None, db_port: Optional[int] = None, db_name: Optional[str] = None, db_authentication_database: Optional[str] = None, db_ssl_enabled: bool = False, verbose: bool = False) -> None:
         self.__operations = {
             'repos': self.__create_mongo_repo,
             'workflows': self.__create_mongo_workflow,
@@ -182,6 +182,8 @@ class Mongo:
             'jobs': self.__create_mongo_job,
             'artifacts': self.__create_mongo_artifact
         }
+
+        self.verbose = verbose
 
         self.__conn_uri = utils.create_mongodb_uri_string(db_user, db_password, db_hostname, db_port, db_authentication_database, db_ssl_enabled)
         self.db_name = db_name
@@ -216,16 +218,33 @@ class Mongo:
         return Artifacts
 
 
-    def drop_collection(self, col_name: Optional[str] = None):
+    def drop_database(self) -> None:
+        self.__conn.drop_database(self.db_name)
+        logger.debug(f'Database { self.db_name } is dropped')
+
+        if self.verbose:
+            print(f'Database { self.db_name } is dropped')
+
+
+
+    def drop_collection(self, col_name: Optional[str] = None) -> None:
 
         if not col_name:
             return None
 
         if col_name in self.__conn.get_database(self.db_name).list_collection_names():
             self.__conn.get_database(self.db_name).drop_collection(col_name)
-            print(f'Collection {col_name} deleted.')
+
+            logger.debug(f'Collection { col_name } is dropped')
+
+            if self.verbose:
+                print(f'Collection {col_name} is dropped.')
+
         else:
-            print(f'Collection {col_name} not found.')
+            logger.debug(f'Collection { col_name } is dropped')
+
+            if self.verbose:
+                print(f'Collection {col_name} not found.')
 
 
 
