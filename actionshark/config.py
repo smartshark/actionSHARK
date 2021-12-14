@@ -15,6 +15,7 @@ class Config:
         self.db_port = args.db_port
         self.db_authentication = args.db_authentication
         self.db_ssl = args.ssl
+        self.debug = args.debug
 
         # if environment variable passed and not concrete token
         if not self.token:

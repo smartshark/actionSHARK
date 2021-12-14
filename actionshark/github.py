@@ -1,6 +1,6 @@
 import json
 from typing import Optional
-from time import sleep
+from time import process_time, sleep
 import os
 import sys
 import datetime as dt
@@ -28,15 +28,13 @@ class GitHub():
     limit_handler_counter = 0
 
 
-    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, file_path: Optional[str] = None, env_variable: Optional[str] = None, save_mongo = None, debug_mode: bool = True, sleep_interval: int = 2, verbose: bool = True) -> None:
+    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, token: Optional[str] = None, save_mongo = None, debug_mode: bool = False, sleep_interval: int = 2, verbose: bool = True) -> None:
         """Extract Token from settings file or environment variable for Authentication.
 
         Args:
             owner (Optional[str], optional): [description]. Defaults to None.
             repo (Optional[str], optional): [description]. Defaults to None.
             per_page (int, optional): [description]. Defaults to 100.
-            file_path (Optional[str], optional): [description]. Defaults to None.
-            env_variable (Optional[str], optional): [description]. Defaults to None.
             save_mongo (Optional[function], optional): [description]. Defaults to None.
             debug_mode (bool, optional): [description]. Defaults to True.
             sleep_interval (int, optional): [description]. Defaults to 2.
@@ -47,43 +45,14 @@ class GitHub():
         if debug_mode:
             self.create_folders()
 
-        # check either json file or environment variable got passed
-        if not file_path and not env_variable:
-            print(f'ERROR: Add the path to JSON file with Access Token')
-            sys.exit(1)
-
         # check owner and repo
-        if not owner or not repo:
+        if not owner or not repo or not save_mongo:
             print('Please make to sure to pass both the owner and repo names.')
             sys.exit(1)
 
-        # get token from environment variable
-        if env_variable:
-            self.__token = os.environ.get(env_variable)
-
-        # get token from a json file
-        else:
-            if not file_path.split('.')[-1] == 'json':
-                print('Please pass a "json" file path or add file extention in case the file is "json".')
-                sys.exit(1)
-
-            with open(file_path, 'r', encoding='utf-8') as f:
-                lines = json.load(f)
-            self.__token = lines.get('access_token')
-
-            if not self.__token:
-                print('Please set the token key to "access_token".')
-                sys.exit(1)
-
-
-
-        if not self.__token:
-            print(f'ERROR retriving token, please make sure you set the "file_path" or "env_variable" correctly.')
-            sys.exit(1)
-
-
         # add token to header and check initial quota
-        self.__headers['Authorization'] = f'token {self.__token}'
+        if token:
+            self.__headers['Authorization'] = f'token {token}'
 
         # MongoDB
         self.save_mongo = save_mongo
@@ -126,14 +95,12 @@ class GitHub():
             verbose (bool, optional): [description]. Defaults to False.
         """
 
-        basic_auth = requests.get(self.api_url + 'user', self.__headers)
+        basic_auth = requests.get(self.api_url + 'user', headers=self.__headers)
 
         self.total_requests += 1
         self.remaining -= 1
 
         if basic_auth.status_code == 200:
-
-            self.is_authenticated = True
 
             basic_auth_json = basic_auth.json()
 
@@ -143,13 +110,17 @@ class GitHub():
                 print(basic_auth_json['html_url'])
                 print('_'*60)
 
+            return True
+
         else:
-            self.is_authenticated = False
 
             if verbose:
                 # 401 = 'Unauthorized'
                 print(basic_auth.status_code)
                 print(basic_auth.reason)
+                print(self.api_url + 'user')
+
+            return False
 
 
 
@@ -182,6 +153,9 @@ class GitHub():
                 print("__"*30)
 
         else:
+            self.remaining = 0
+            self.reset_datetime = self.get_dt_now()
+
             print(response.status_code)
             print(response.reason)
 
@@ -277,19 +251,28 @@ class GitHub():
             response_JSON = response.json()
             if checker:
                 response_JSON = response_JSON.get(checker)
+            # count number of documents
+            response_count = len(response_JSON)
 
             # handel case: limit was not reached and an hour passed -> reset limit variables
             if not response_JSON:
                 if self.verbose:
                     print(f'Response is Empty ... Stopping.')
-                    print('NEXT ACTION:','> >'*30 ,'\n')
+                    print('NEXT ACTION:','> > '*10 ,'\n')
                 break
 
             # ?function to save documents to mongodb
-            # self.save_mongo(response_JSON, self.current_action)
+            self.save_mongo(response_JSON, self.current_action)
 
             # *DEBUGGING
-            self.save_JSON(response_JSON, save_path)
+            # self.save_JSON(response_JSON, save_path)
+
+            # break after saving if response_count is less than per_page
+            if response_count < self.per_page:
+                if self.verbose:
+                    print(f'Full Response is saved ... Stopping.')
+                    print('NEXT ACTION:','> > '*10 ,'\n')
+                break
 
             # handel page incrementing
             github_url = github_url[:-len(f'&page={self.page}')]
@@ -433,24 +416,27 @@ class GitHub():
 
 
 
-    def get_all(self, runs_object = None) -> None:
+    def run(self, runs_object = None) -> None:
 
-        if not self.authenticate_user():
-            print("Wrong token, please try again.")
-            sys.exit(1)
+        # verify correct token if any
+        if self.token:
+            if not self.authenticate_user(verbose=True):
+                print("Wrong token, please try again.")
+                sys.exit(1)
 
         self.get_owner_repostries()
         self.get_workflows()
         self.get_runs()
 
-        # if Runs object was passed, for each Run get
+        # # if Runs object was passed, for each Run get
         if runs_object:
-            # get
+
             for run in runs_object.objects():
                 self.get_jobs(run.id)
 
             for run in runs_object.objects():
                 self.get_artifacts(run.id)
+
 
 
 
@@ -509,17 +495,10 @@ if __name__ == '__main__':
     # run_id = 1514809363
 
 
-    owner_name = 'apache'
-    repo_name = 'commons-lang'
+    # owner_name = 'apache'
+    # repo_name = 'commons-lang'
 
-    cls_GitHub = GitHub(owner=owner_name, repo=repo_name, env_variable='GITHUB_Token', verbose=True)
+    # cls_GitHub = GitHub(owner=owner_name, repo=repo_name, env_variable='GITHUB_Token', debug_mode=True, verbose=True)
 
-    # print(cls_GitHub)
-    # for _ in range(58):
-    #     cls_GitHub.authenticate_user()
 
-    print(cls_GitHub)
-
-    cls_GitHub.get_all()
-
-    cls_GitHub.get_limit(verbose=True)
+    ...

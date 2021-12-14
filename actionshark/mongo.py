@@ -1,11 +1,11 @@
 import os
 import json
 import datetime as dt
-import github as gh
 from typing import Optional
 
 from mongoengine import connect
 import pycoshark.utils as utils
+# from github import GitHub
 
 
 class Repositories(utils.Document):
@@ -26,7 +26,7 @@ class Repositories(utils.Document):
     watchers_count = utils.IntField()
     open_issues = utils.IntField()
     visibility = utils.StringField()
-    topics = utils.ListField( utils.StringField() )
+    topics = utils.ListField( utils.StringField() ) # TODO sub list data type
 
     def __str__(self):
         return '\n'.join([
@@ -81,13 +81,13 @@ class Runs(utils.Document):
     status = utils.StringField()
     conclusion = utils.StringField()
     workflow_id = utils.IntField()
-    pull_requests =  utils.ListField( utils.DictField(default=None) )
+    pull_requests =  utils.ListField( utils.DictField(default=None) ) # TODO sub list data type
     created_at = utils.DateTimeField(default=None)
     updated_at = utils.DateTimeField(default=None)
-    run_attempt = utils.IntField()
+    run_attempt = utils.IntField(default=None)
     run_started_at = utils.DateTimeField(default=None)
-    head_commit =  utils.DictField()
-    head_repository =  utils.DictField()
+    head_commit =  utils.DictField(default=None)
+    head_repository =  utils.DictField(default=None)
 
     def __str__(self):
         return '\n'.join([
@@ -120,11 +120,11 @@ class Jobs(utils.Document):
     conclusion = utils.StringField()
     started_at = utils.DateTimeField(default=None)
     completed_at = utils.DateTimeField(default=None)
-    steps = utils.ListField( utils.DictField() )
-    runner_id = utils.IntField()
-    runner_name = utils.StringField()
-    runner_group_id = utils.IntField()
-    runner_group_name = utils.StringField()
+    steps = utils.ListField( utils.DictField() ) # TODO sub list data type
+    runner_id = utils.IntField(default=None)
+    runner_name = utils.StringField(default=None)
+    runner_group_id = utils.IntField(default=None)
+    runner_group_name = utils.StringField(default=None)
 
     def __str__(self):
         return '\n'.join([
@@ -168,6 +168,7 @@ class Artifacts(utils.Document):
             f'expires_at : {self.expires_at}'
         ])
 
+
 class Mongo:
 
 
@@ -182,8 +183,44 @@ class Mongo:
         }
 
         self.__conn_uri = utils.create_mongodb_uri_string(db_user, db_password, db_hostname, db_port, db_authentication_database, db_ssl_enabled)
+        self.db_name = db_name
+        self.__conn = connect(db_name, host=self.__conn_uri)
 
-        connect(db_name, host=self.__conn_uri)
+    @property
+    def repositories(self):
+        return Repositories
+
+
+    @property
+    def workflows(self):
+        return Workflows
+
+
+    @property
+    def runs(self):
+        return Runs
+
+
+    @property
+    def jobs(self):
+        return Jobs
+
+
+    @property
+    def artifacts(self):
+        return Artifacts
+
+
+    def drop_collection(self, col_name: Optional[str] = None):
+
+        if not col_name:
+            return None
+
+        if col_name in self.__conn.get_database(self.db_name).list_collection_names():
+            self.__conn.get_database(self.db_name).drop_collection(col_name)
+            print(f'Collection {col_name} deleted.')
+        else:
+            print(f'Collection {col_name} not found.')
 
 
 
@@ -307,12 +344,12 @@ class Mongo:
         job.run_attempt = int( obj.get('run_attempt') )
         job.status = obj.get('status')
         job.conclusion = obj.get('conclusion')
-        job.started_at = dt.datetime.strptime( obj.get('started_at'), '%Y-%m-%dT%H:%M:%SZ' )
-        job.completed_at = dt.datetime.strptime( obj.get('completed_at'), '%Y-%m-%dT%H:%M:%SZ' )
+        job.started_at = dt.datetime.strptime( obj.get('started_at'), '%Y-%m-%dT%H:%M:%SZ' ) if obj.get('started_at') else None
+        job.completed_at = dt.datetime.strptime( obj.get('completed_at'), '%Y-%m-%dT%H:%M:%SZ' ) if obj.get('completed_at') else None
         job.steps = obj.get('steps')
-        job.runner_id = int( obj.get('runner_id') )
+        job.runner_id = int( obj.get('runner_id') ) if obj.get('runner_id') else None
         job.runner_name = obj.get('runner_name')
-        job.runner_group_id = int( obj.get('runner_group_id') )
+        job.runner_group_id = int( obj.get('runner_group_id') ) if obj.get('runner_group_id') else None
         job.runner_group_name = obj.get('runner_group_name')
 
         return job
@@ -336,14 +373,15 @@ class Mongo:
         return artifact
 
 
+
 if __name__ == '__main__':
 
-    cls_mongo = Mongo()
-    # cls_mongo.insert_JSON('./data/workflows', 'workflows')
-    # cls_mongo.insert_JSON('./data/repositories', 'repositories')
-    # cls_mongo.insert_JSON('./data/runs', 'runs')
-    # cls_mongo.insert_JSON('./data/jobs', 'jobs')
-    # cls_mongo.insert_JSON('./data/artifacts', 'artifacts')
+    # cls_mongo = Mongo(db_name='actionshark', db_hostname='localhost', db_port=27017)
 
-    # for obj in Runs.objects():
-    #    print(obj.id)
+    # cls_mongo.insert_JSON('./data/workflows', 'workflows')
+
+    # cls_github = GitHub(owner='apache', repo='commons-lang', token=os.environ.get('GITHUB_Token'), save_mongo=cls_mongo.save_documents)
+
+    # cls_github.get_jobs(run_id=1230131767)
+
+    ...

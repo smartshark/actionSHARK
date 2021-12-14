@@ -8,7 +8,6 @@ from actionshark.mongo import Mongo
 from actionshark.github import GitHub
 
 def collect_args():
-    # parser = get_base_argparser('Collects information from command line.', '0.0.1')
     parser = utils.get_base_argparser('Collects information from command line.', '0.0.1')
 
     # GitHub Args
@@ -24,17 +23,24 @@ def collect_args():
     return parser.parse_args()
 
 
+
 def main(cfg):
-    mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.ssl)
-    github = GitHub()
+    # initiate mongo instance
+    mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.db_ssl)
+
+    # initiate GitHub instance
+    github = GitHub(owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents, verbose=True)
+
+    # get all actions
+    github.run( mongo.run_object() )
 
 
 if __name__ == "__main__":
+    # collect args from terminal
     args = collect_args()
 
     # map args to variables and authenticate token
     cls_config = Config(args)
 
     # handel github and mongodb side
-    cls_actions = Actions(cls_config)
-    cls_actions.start()
+    main(cls_config)
