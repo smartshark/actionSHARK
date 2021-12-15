@@ -9,6 +9,10 @@ from actionshark.mongo import Mongo
 from actionshark.github import GitHub
 
 
+# create log folder
+if not os.path.exists('logs'):
+    os.mkdir('logs')
+
 # logger configuration
 current_datetime = datetime.strftime( datetime.now().replace(microsecond=0), '%Y-%m-%d_%H-%M-%S' )
 logging.basicConfig(
@@ -17,7 +21,7 @@ logging.basicConfig(
     datefmt="%d/%m/%Y %H:%M:%S"
     )
 
-
+# parsing command line arguments
 def collect_args():
     parser = utils.get_base_argparser('Collects information from command line.', '0.0.1')
 
@@ -35,7 +39,7 @@ def collect_args():
     return parser.parse_args()
 
 
-
+# main function
 def main(cfg):
 
     # initializing logger
