@@ -1,6 +1,6 @@
 import json
-from typing import Optional
-from time import process_time, sleep
+from typing import Callable, Optional
+from time import sleep
 import os
 import sys
 import datetime as dt
@@ -31,7 +31,7 @@ class GitHub():
     limit_handler_counter = 0
 
 
-    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, token: Optional[str] = None, save_mongo = None, debug_mode: bool = False, sleep_interval: int = 2, verbose: bool = True) -> None:
+    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, token: Optional[str] = None, save_mongo: Callable = None, debug_mode: bool = False, sleep_interval: int = 2, verbose: bool = True) -> None:
         """Extract Token from settings file or environment variable for Authentication.
 
         Args:
@@ -311,6 +311,7 @@ class GitHub():
 
             # handel case: limit was not reached and an hour passed -> reset limit variables
             if (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
+                logger.debug('Hour passed without hitting the limit')
                 self.update_limit_variables()
 
 
