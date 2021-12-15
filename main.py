@@ -40,7 +40,12 @@ def collect_args():
 
 
 # main function
-def main(cfg):
+def main():
+    # collect args from terminal
+    args = collect_args()
+
+    # map args to variables and authenticate token
+    cfg = Config(args)
 
     # initializing logger
     logger = logging.getLogger("actionshark")
@@ -68,14 +73,4 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-
-    # collect args from terminal
-    args = collect_args()
-
-    # map args to variables and authenticate token
-    cls_config = Config(args)
-
-    # handel github and mongodb side
-    main(cls_config)
-
-    ...
+    main()
