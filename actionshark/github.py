@@ -483,17 +483,24 @@ class GitHub():
 
         # if Runs object was passed, for each Run get
         if runs_object:
+            # collect ids in a list to avoid cursor timeout
+            logger.debug('Collecting run ids')
+            run_ids = [run.id for run in runs_object.objects()]
+            logger.debug('Done collecting run ids')
+            if self.verbose:
+                print('Collecting run idsCollecting run ids')
+
             # logger is used here to not log each time the function excutes
-            logger.debug(f'start fetching jobs')
-            for run in runs_object.objects():
-                self.get_jobs(run.id)
-            logger.debug(f'finish fetching jobs')
+            logger.debug(f'Start fetching jobs')
+            for run in run_ids:
+                self.get_jobs(run)
+            logger.debug(f'Finish fetching jobs')
 
 
-            logger.debug(f'start fetching artifacts')
-            for run in runs_object.objects():
-                self.get_artifacts(run.id)
-            logger.debug(f'finish fetching artifacts')
+            logger.debug(f'Start fetching artifacts')
+            for run in run_ids:
+                self.get_artifacts(run)
+            logger.debug(f'Finish fetching artifacts')
 
 
 
