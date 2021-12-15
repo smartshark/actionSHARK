@@ -282,7 +282,7 @@ class GitHub():
             if not response_JSON:
                 if self.verbose:
                     print(f'Response is Empty ... Stopping.')
-                    print('-'*( len(github_url)+10) )
+                    print('-'*( len(github_url)+20) )
                 break
 
             # save documents to mongodb
@@ -295,7 +295,7 @@ class GitHub():
             if response_count < self.per_page:
                 if self.verbose:
                     print(f'Full Response is saved ... Stopping.')
-                    print('-'*len(github_url))
+                    print('-'*( len(github_url)+20))
                 break
 
             # handel page incrementing
@@ -308,7 +308,6 @@ class GitHub():
             # updating variables to deal with limits
             self.total_requests += 1
             self.remaining -= 1
-
 
             # handel case: limit was not reached and an hour passed -> reset limit variables
             if (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
@@ -340,7 +339,7 @@ class GitHub():
         logger.debug(f'start fetching repositories')
 
         if self.verbose:
-            print('-'*( len(github_url)+10) )
+            print('-'*( len(github_url)+20) )
 
         self.paginating(github_url, None, save_path)
 
@@ -367,7 +366,7 @@ class GitHub():
         logger.debug(f'start fetching workflows')
 
         if self.verbose:
-            print('-'*( len(github_url)+10) )
+            print('-'*( len(github_url)+20) )
 
         self.paginating(github_url, 'workflows', save_path)
 
@@ -397,7 +396,7 @@ class GitHub():
         logger.debug(f'start fetching runs')
 
         if self.verbose:
-            print('-'*( len(github_url)+10) )
+            print('-'*( len(github_url)+20) )
 
         self.paginating(github_url, 'workflow_runs', save_path)
 
@@ -428,7 +427,7 @@ class GitHub():
             save_path = f'./actionshark/data/jobs/{self.owner}_{self.repo}_run_{run_id}_jobs.json'
 
         if self.verbose:
-            print('-'*( len(github_url)+10) )
+            print('-'*( len(github_url)+20) )
 
         self.paginating(github_url, 'jobs', save_path)
 
@@ -458,7 +457,7 @@ class GitHub():
             save_path = f'./actionshark/data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
 
         if self.verbose:
-            print('-'*( len(github_url)+10) )
+            print('-'*( len(github_url)+20) )
 
         self.paginating(github_url, 'artifacts', save_path)
 
