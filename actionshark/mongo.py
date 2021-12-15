@@ -80,7 +80,7 @@ class Runs(utils.Document):
     id = utils.IntField(primary_key=True)
     name = utils.StringField()
     run_number = utils.IntField()
-    event = utils.StringField(max_length=15, required=True)
+    event = utils.StringField(required=True)
     status = utils.StringField()
     conclusion = utils.StringField()
     workflow_id = utils.IntField()
@@ -261,7 +261,7 @@ class Mongo:
         func = self.__operations[action]
 
         for document in documents:
-                func(document).save()
+            func(document).save()
 
 
     # *DEBUGGING
