@@ -5,7 +5,6 @@ from typing import Optional
 import logging
 
 from mongoengine import connect
-from pymongo.errors import CursorNotFound
 import pycoshark.utils as utils
 
 # start logger
@@ -262,12 +261,6 @@ class Mongo:
         func = self.__operations[action]
 
         for document in documents:
-            try:
-                func(document).save()
-            # handel cursor timeout after long sleep
-            except CursorNotFound:
-                logger.debug('Cursor timedout, reconnecting to MongoDB')
-                self.__conn = connect(self.db_name, host=self.__conn_uri)
                 func(document).save()
 
 
