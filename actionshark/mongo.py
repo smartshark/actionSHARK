@@ -1,11 +1,10 @@
 import os
 import json
 import datetime as dt
-from typing import DefaultDict, Optional
+from typing import Optional
 import logging
 
-from mongoengine import connect, EmbeddedDocumentListField
-from mongoengine.document import Document
+from mongoengine import connect
 import pycoshark.utils as utils
 
 # start logger
@@ -34,7 +33,7 @@ class Workflows(utils.Document):
         ])
 
 
-class RunPullRequests(Document):
+class RunPullRequests(utils.Document):
     id = utils.IntField()
     number = utils.IntField()
     head_id = utils.IntField()
@@ -56,7 +55,7 @@ class Runs(utils.Document):
     status = utils.StringField()
     conclusion = utils.StringField()
     workflow_id = utils.IntField()
-    pull_requests =  EmbeddedDocumentListField(RunPullRequests, default=[])
+    pull_requests =  utils.ListField( utils.DictField(), default=[] )
     created_at = utils.DateTimeField(default=None)
     updated_at = utils.DateTimeField(default=None)
     run_attempt = utils.IntField(default=None)
@@ -82,7 +81,7 @@ class Runs(utils.Document):
         ])
 
 
-class JobSteps(Document):
+class JobSteps(utils.Document):
     name = utils.StringField()
     status = utils.StringField()
     conclusion = utils.StringField()
@@ -103,7 +102,7 @@ class Jobs(utils.Document):
     conclusion = utils.StringField()
     started_at = utils.DateTimeField(default=None)
     completed_at = utils.DateTimeField(default=None)
-    steps = EmbeddedDocumentListField(JobSteps, default=[])
+    steps = utils.ListField( utils.DictField(), default=[] )
     runner_id = utils.IntField(default=None)
     runner_name = utils.StringField(default=None)
     runner_group_id = utils.IntField(default=None)
