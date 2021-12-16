@@ -1,25 +1,12 @@
-import os
-import sys
-from datetime import datetime
+import json
 import logging
+import logging.config
 
 import pycoshark.utils as utils
 from actionshark.config import Config
 from actionshark.mongo import Mongo
 from actionshark.github import GitHub
 
-
-# create log folder
-if not os.path.exists('logs'):
-    os.mkdir('logs')
-
-# logger configuration
-current_datetime = datetime.strftime( datetime.now().replace(microsecond=0), '%Y-%m-%d_%H-%M-%S' )
-logging.basicConfig(
-    filename=f"logs/actionshark_{ current_datetime }.log",
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%d/%m/%Y %H:%M:%S"
-    )
 
 # parsing command line arguments
 def collect_args():
@@ -30,7 +17,6 @@ def collect_args():
     parser.add_argument('-env', '--token-env', help='Environment variable, where token is stored.', required=False, type=str)
     parser.add_argument('-o', '--owner', help='Owner name of the repository.', required=True, type=str)
     parser.add_argument('-r', '--repository', help='Repository Name.', required=True, type=str)
-    parser.add_argument('-ver', '--verbose', help='True, if print out extra messages to the console', required=False, default=False, type=bool)
 
     # General
     parser.add_argument('--debug', help='Sets the debug level.', default='DEBUG',
@@ -39,31 +25,29 @@ def collect_args():
     return parser.parse_args()
 
 
+# load logger configuration
+with open('./logger_config.json', 'r') as f:
+        logging.config.dictConfig( json.load(f) )
+
+
 # main function
 def main():
-    # collect args from terminal
-    args = collect_args()
-
-    # map args to variables and authenticate token
-    cfg = Config(args)
-
-    # initializing logger
-    logger = logging.getLogger("actionshark")
-
-    # set logging level
-    logger.setLevel( cfg.logger_level )
-
-    # Start logger message
+    # Start logger
+    logger = logging.getLogger('main')
     logger.debug('Start Logging')
 
+    # collect args from terminal to cfg variable
+    args = collect_args()
+    cfg = Config(args)
+
     # initiate mongo instance
-    mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.db_ssl, verbose=cfg.verbose)
+    mongo = Mongo(cfg.db_user, cfg.db_password, cfg.db_hostname, cfg.db_port, cfg.db_database, cfg.db_authentication, cfg.db_ssl)
 
     # *DEBUGGING
     mongo.drop_database()
 
     # initiate GitHub instance
-    github = GitHub(owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents, verbose=cfg.verbose)
+    github = GitHub(owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents)
 
     # get all actions
     github.run( mongo.runs )

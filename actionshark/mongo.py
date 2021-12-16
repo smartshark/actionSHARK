@@ -1,5 +1,3 @@
-import os
-import json
 import datetime as dt
 from typing import Optional
 import logging
@@ -8,7 +6,7 @@ from mongoengine import connect
 import pycoshark.utils as utils
 
 # start logger
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('main.mongo')
 
 
 class Workflows(utils.Document):
@@ -153,7 +151,7 @@ class Artifacts(utils.Document):
 
 class Mongo:
 
-    def __init__(self, db_user: Optional[str] = None, db_password: Optional[str] = None, db_hostname: Optional[str] = None, db_port: Optional[int] = None, db_name: Optional[str] = None, db_authentication_database: Optional[str] = None, db_ssl_enabled: bool = False, verbose: bool = False) -> None:
+    def __init__(self, db_user: Optional[str] = None, db_password: Optional[str] = None, db_hostname: Optional[str] = None, db_port: Optional[int] = None, db_name: Optional[str] = None, db_authentication_database: Optional[str] = None, db_ssl_enabled: bool = False) -> None:
         self.__operations = {
             'workflows': self.__create_mongo_workflow,
             'runs': self.__create_mongo_run,
@@ -161,14 +159,11 @@ class Mongo:
             'artifacts': self.__create_mongo_artifact
         }
 
-        self.verbose = verbose
+        self.db_name = db_name
 
         self.__conn_uri = utils.create_mongodb_uri_string(db_user, db_password, db_hostname, db_port, db_authentication_database, db_ssl_enabled)
-        self.db_name = db_name
         self.__conn = connect(db_name, host=self.__conn_uri)
-
         logger.debug(f'Mongo connected to {db_name}')
-        # logger.debug(f'Connection parameter db_user: {db_user}, db_password: {db_password}, db_hostname: {db_hostname}, db_port: {db_port}, db_authentication_database: {db_authentication_database}, db_ssl_enabled: {db_ssl_enabled},')
 
 
     @property
@@ -197,9 +192,6 @@ class Mongo:
         self.__conn.drop_database(self.db_name)
         logger.debug(f'Database { self.db_name } is dropped')
 
-        if self.verbose:
-            print(f'Database { self.db_name } is dropped')
-
 
 
     def drop_collection(self, col_name: Optional[str] = None) -> None:
@@ -215,20 +207,13 @@ class Mongo:
 
         # check if collection is in database
         if col_name not in self.__conn.get_database(self.db_name).list_collection_names():
-            logger.debug(f'Collection { col_name } is dropped')
-
-            if self.verbose:
-                print(f'Collection {col_name} not found.')
-
+            logger.error(f'Collection { col_name } is dropped')
             return False
 
         # Delete if found
         self.__conn.get_database(self.db_name).drop_collection(col_name)
 
         logger.debug(f'Collection { col_name } is dropped')
-
-        if self.verbose:
-            print(f'Collection {col_name} is dropped.')
 
         return True
 
@@ -244,12 +229,12 @@ class Mongo:
 
         # check if documents and action are not None
         if not documents or not action:
-            logger.debug(f'No documents or action got passed')
+            logger.error(f'No documents or action got passed')
             return None
 
         # check if the passed action is available
         if action not in self.__operations.keys():
-            logger.debug(f'Action {action} was not found in predefined operations')
+            logger.error(f'Action {action} was not found in predefined operations')
             return None
 
         # call the mapping function
@@ -257,7 +242,12 @@ class Mongo:
 
         # map and save all documents
         for document in documents:
-                func(document).save()
+                try:
+                    func(document).save()
+                except:
+                    logger.error(f'Failed saving document action:{action} and id:{document["id"]}')
+                    continue
+
 
 
     def __create_mongo_workflow(self, obj: Optional[dict] = None) -> Workflows:

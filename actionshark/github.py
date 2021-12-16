@@ -1,4 +1,3 @@
-import json
 from typing import Callable, Optional
 from time import sleep
 import os
@@ -7,8 +6,9 @@ import datetime as dt
 import requests
 import logging
 
+
 # start logger
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('main.mongo')
 
 class GitHub():
     """
@@ -31,7 +31,7 @@ class GitHub():
     limit_handler_counter = 0
 
 
-    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, token: Optional[str] = None, save_mongo: Callable = None, sleep_interval: int = 2, verbose: bool = True) -> None:
+    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, token: Optional[str] = None, save_mongo: Callable = None, sleep_interval: int = 2) -> None:
         """Initializing essential variables to use in the requests.
 
         Args:
@@ -45,13 +45,14 @@ class GitHub():
 
         # check owner and repo
         if not owner or not repo or not save_mongo:
-            logger.debug(f'not all owner and repo names and save_mongo function was passed')
-            print('Please make to sure to pass owner and repo names and save_mongo function.')
+            logger.error(f'Please make to sure to pass owner and repo names and save_mongo function.')
             sys.exit(1)
 
-        # add token to header and check initial quota
+        # add token to header
+        self.__token = None
         if token:
             self.__headers['Authorization'] = f'token {token}'
+            self.__token = token
 
         # MongoDB
         self.save_mongo = save_mongo
@@ -62,11 +63,9 @@ class GitHub():
         self.per_page = per_page
         self.page = 1
         self.sleep_betw_requests = sleep_interval
-        self.verbose = verbose
 
         # initiate limit variables
-        self.update_limit_variables()
-        self.last_stop_datetime = self.get_dt_now()
+        self.get_limit()
 
 
 
@@ -81,13 +80,12 @@ class GitHub():
             f"Next Reset: {self.reset_datetime}",
             f"Last Stop: {self.last_stop_datetime}",
             f"SleepInterval: {self.sleep_betw_requests}",
-            f"verbose: {self.verbose}",
             "_"*30, ""
         ])
 
 
 
-    def authenticate_user(self, verbose: bool = False):
+    def authenticate_user(self):
         """Authenticate passed token by requesting user information.
 
         Args:
@@ -102,24 +100,14 @@ class GitHub():
         # if 401 = 'Unauthorized', but other response means the use is authorized
         if basic_auth.status_code == 401:
 
-            logger.debug(f'Error authenticated using token')
-
-            if verbose:
-                print('Error Authentication:', basic_auth.status_code)
-                print(basic_auth.reason)
-                print(self.api_url + 'user')
+            logger.error(f'Error authenticated using token')
+            logger.error('Authentication status_code:', basic_auth.status_code)
+            logger.error(basic_auth.reason)
+            logger.error(self.api_url + 'user')
 
             return False
 
         logger.debug(f'Successfully authenticated using token')
-
-        basic_auth_json = basic_auth.json()
-
-        if verbose:
-            print('Successful Authentication:', basic_auth.status_code)
-            print(basic_auth_json['name'])
-            print(basic_auth_json['html_url'])
-            print('_'*60)
 
         return True
 
@@ -130,7 +118,7 @@ class GitHub():
 
 
 
-    def get_limit(self, verbose: bool = False):
+    def get_limit(self):
         """Collect limitation parameters.
 
         Args:
@@ -139,26 +127,27 @@ class GitHub():
 
         response = requests.get(self.api_url + 'rate_limit', headers=self.__headers)
 
-        if response.status_code == 200:
-            temp = response.json()['resources']['core']
-            self.remaining = temp["remaining"]
-            self.reset_datetime = dt.datetime.fromtimestamp(temp["reset"])
-            self.limit = temp["limit"]
-
-            if verbose: # local verbose
-                print("__"*30)
-                print(f'Limit :{self.limit}')
-                print(f'Used :{temp["used"]}')
-                print(f'Remaining :{self.remaining}')
-                print(f'Reset :{self.reset_datetime}')
-                print("__"*30)
-
-        else:
+        if response.status_code != 200:
             self.remaining = 0
             self.reset_datetime = self.get_dt_now()
 
-            print('Error getting limit and quota', response.status_code)
-            print(response.reason)
+            logger.error('limit and quota', response.status_code)
+            logger.error(response.reason)
+
+
+        temp = response.json()['resources']['core']
+        self.remaining = temp["remaining"]
+        self.reset_datetime = dt.datetime.fromtimestamp(temp["reset"])
+        self.last_stop_datetime = self.get_dt_now()
+
+        # add error margin
+        self.remaining -= 2
+        self.reset_datetime += dt.timedelta(seconds=2)
+
+        logger.debug(f'Updating limit handler variables')
+        logger.debug(f'limit variable remaining: {self.remaining}')
+        logger.debug(f'limit variable reset_datetime: {self.reset_datetime}')
+        logger.debug(f'Finished limit handler variables')
 
 
 
@@ -174,50 +163,17 @@ class GitHub():
 
         self.limit_handler_counter += 1
 
-        if self.verbose:
-            print('\\\\'*40)
-            print(f'Limit handler is triggered')
-            print(f'Program will sleep for approximately {self.force_to_sleep:n} seconds.')
-            print(f'Next Restart will be on {self.reset_datetime.time()}')
-            print('//'*40)
-
-        logger.debug(f'Limit handler is triggered, program will sleep for approximately {self.force_to_sleep:n} seconds.')
+        logger.debug(f'Limit handler is triggered')
+        logger.debug(f'Program will sleep for approximately {self.force_to_sleep:n} seconds.')
         logger.debug(f'Next Restart will be on {self.reset_datetime.time()}')
 
         # long sleep till limit reset
         sleep(self.force_to_sleep)
 
         # update limit variables
-        self.update_limit_variables()
+        self.get_limit()
 
         logger.debug(f'Continue with {self.current_action} from page {self.page}')
-
-        if self.verbose:
-            print('\\\\'*40)
-            print(f'Continue with {self.current_action} from page {self.page}...')
-
-            #* DEBUGGING
-            self.get_limit(verbose=True)
-            print('//'*40)
-
-
-
-    def update_limit_variables(self):
-        """Update limitation parameters.
-        """
-        # update limit variables and error margin
-        self.get_limit()
-        self.remaining -= 2
-        self.reset_datetime += dt.timedelta(seconds=2)
-
-        logger.debug(f'Updating limit handler variables')
-        logger.debug(f'limit variable remaining: {self.remaining}')
-        logger.debug(f'limit variable reset_datetime: {self.reset_datetime}')
-        logger.debug(f'limit variable limit: {self.limit}')
-        logger.debug(f'Finished limit handler variables')
-
-        if self.verbose:
-            print(f'-- Update limit handler variables.')
 
 
 
@@ -241,18 +197,11 @@ class GitHub():
             # get response
             response = requests.get(github_url, headers=self.__headers)
 
-            if self.verbose:
-                print(f'{self.current_action} url:', github_url)
-
             # Abort if unknown error occurred
             if response.status_code != 200 and response.status_code != 403:
-
-                logger.debug(f'Error in request status_code: {response.status_code}')
-                logger.debug(f'Error in request github_url: {github_url}')
-
-                print("Error in request.")
-                print(response.status_code)
-                print(response)
+                logger.error(f'Error in request status_code: {response.status_code}')
+                logger.error(f'Error in request github_url: {github_url}')
+                logger.error(response)
                 sys.exit(1)
 
             # handel case: limit achieved and action was not fully fetched -> stopped while paginating
@@ -271,22 +220,13 @@ class GitHub():
 
             # handel case: limit was not reached and an hour passed -> reset limit variables
             if not response_JSON:
-                if self.verbose:
-                    print(f'Response is Empty ... Stopping.')
-                    print('-'*( len(github_url)+20) )
                 break
 
             # save documents to mongodb
             self.save_mongo(response_JSON, self.current_action)
 
-            # *DEBUGGING
-            # self.save_JSON(response_JSON, save_path)
-
             # break after saving if response_count is less than per_page
             if response_count < self.per_page:
-                if self.verbose:
-                    print(f'Full Response is saved ... Stopping.')
-                    print('-'*( len(github_url)+20))
                 break
 
             # handel page incrementing
@@ -303,7 +243,7 @@ class GitHub():
             # handel case: limit was not reached and an hour passed -> reset limit variables
             if (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
                 logger.debug('Hour passed without hitting the limit')
-                self.update_limit_variables()
+                self.get_limit()
 
 
 
@@ -317,14 +257,11 @@ class GitHub():
         url = self.actions_url['workflows'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
         github_url = self.api_url + url
 
-        logger.debug(f'start fetching workflows')
-
-        if self.verbose:
-            print('-'*( len(github_url)+20) )
+        logger.debug(f'Start fetching workflows')
 
         self.paginating(github_url, 'workflows')
 
-        logger.debug(f'finish fetching workflows')
+        logger.debug(f'Finish fetching workflows')
 
 
 
@@ -339,14 +276,11 @@ class GitHub():
         url += f'&exclude_pull_requests=False'
         github_url = self.api_url + url
 
-        logger.debug(f'start fetching runs')
-
-        if self.verbose:
-            print('-'*( len(github_url)+20) )
+        logger.debug(f'Start fetching runs')
 
         self.paginating(github_url, 'workflow_runs')
 
-        logger.debug(f'finish fetching runs')
+        logger.debug(f'Finish fetching runs')
 
 
 
@@ -358,7 +292,7 @@ class GitHub():
         """
 
         if not run_id:
-            print('Please make to sure to pass the owner, repo name, and run id.')
+            logger.error('Please make to sure to pass the owner, repo name, and run id.')
             sys.exit(1)
 
         self.current_action = 'jobs'
@@ -366,9 +300,6 @@ class GitHub():
 
         url = self.actions_url['jobs'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
         github_url = self.api_url + url
-
-        if self.verbose:
-            print('-'*( len(github_url)+20) )
 
         self.paginating(github_url, 'jobs')
 
@@ -383,7 +314,7 @@ class GitHub():
         """
 
         if not run_id:
-            print('Please make to sure to pass both the owner and repo names.')
+            logger.error('Please make to sure to pass both the owner and repo names.')
             sys.exit(1)
 
         self.current_action = 'artifacts'
@@ -391,9 +322,6 @@ class GitHub():
 
         url = self.actions_url['artifacts'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
         github_url = self.api_url + url
-
-        if self.verbose:
-            print('-'*( len(github_url)+20) )
 
         self.paginating(github_url, 'artifacts')
 
@@ -407,15 +335,12 @@ class GitHub():
         """
 
         # verify correct token if any
-        if 'Authorization' in self.__headers.keys():
+        if self.__token:
             if not self.authenticate_user(verbose=True):
-
-                logger.debug(f'Wrong token')
-
-                print("Wrong token, please try again.")
                 sys.exit(1)
-        else:
-            logger.debug(f'proceding without token')
+
+        if not self.__token:
+            logger.debug(f'Proceding without token')
 
         self.get_workflows()
         self.get_runs()
@@ -425,9 +350,7 @@ class GitHub():
             # collect ids in a list to avoid cursor timeout
             logger.debug('Collecting run ids')
             run_ids = [run.id for run in runs_object.objects()]
-            logger.debug('Done collecting run ids')
-            if self.verbose:
-                print('Collecting run idsCollecting run ids')
+
 
             # logger is used here to not log each time the function excutes
             logger.debug(f'Start fetching jobs')

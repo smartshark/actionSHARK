@@ -2,7 +2,7 @@ import os
 import logging
 
 # start logger
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('main.config')
 
 
 class Config:
@@ -20,7 +20,6 @@ class Config:
         self.db_authentication = args.db_authentication
         self.db_ssl = args.ssl
         self.logger_level = self.get_logger_level(args.debug)
-        self.verbose = args.verbose
 
         # if environment variable passed and not concrete token
         if not self.token and args.token_env:
@@ -49,7 +48,7 @@ class Config:
 
 
 
-    def get_logger_level(self, level: str = 'debug'):
+    def get_logger_level(self, level: str = 'DEBUG'):
 
         levels = {
             'DEBUG': logging.DEBUG,
@@ -59,9 +58,9 @@ class Config:
             'CRITICAL': logging.CRITICAL
         }
 
-        if level in levels.keys():
-            return levels[level]
-        else:
-            logger.debug("logging level not declared.")
-            return None
+        # defult level to DEBUG
+        if level not in levels.keys():
+            level = 'DEBUG'
+
+        return levels[level]
 
