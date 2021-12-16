@@ -1,10 +1,11 @@
 import os
 import json
 import datetime as dt
-from typing import Optional
+from typing import DefaultDict, Optional
 import logging
 
-from mongoengine import connect
+from mongoengine import connect, EmbeddedDocumentListField
+from mongoengine.document import Document
 import pycoshark.utils as utils
 
 # start logger
@@ -29,7 +30,7 @@ class Repositories(utils.Document):
     watchers_count = utils.IntField()
     open_issues = utils.IntField()
     visibility = utils.StringField()
-    topics = utils.ListField( utils.StringField() ) # TODO sub list data type
+    topics = utils.ListField( utils.StringField() )
 
     def __str__(self):
         return '\n'.join([
@@ -72,6 +73,16 @@ class Workflows(utils.Document):
         ])
 
 
+class RunPullRequests(Document):
+    id = utils.IntField()
+    number = utils.IntField()
+    head_id = utils.IntField()
+    head_ref = utils.StringField()
+    head_name = utils.StringField()
+    base_id = utils.IntField()
+    base_ref = utils.StringField()
+    base_name = utils.StringField()
+
 
 class Runs(utils.Document):
     meta = {
@@ -84,13 +95,13 @@ class Runs(utils.Document):
     status = utils.StringField()
     conclusion = utils.StringField()
     workflow_id = utils.IntField()
-    pull_requests =  utils.ListField( utils.DictField(default=None) ) # TODO sub list data type
+    pull_requests =  EmbeddedDocumentListField(RunPullRequests, default=[])
     created_at = utils.DateTimeField(default=None)
     updated_at = utils.DateTimeField(default=None)
     run_attempt = utils.IntField(default=None)
     run_started_at = utils.DateTimeField(default=None)
-    head_commit =  utils.DictField(default=None)
-    head_repository =  utils.DictField(default=None)
+    head_commit =  utils.DictField(default=None) # TODO either delete or select keys
+    head_repository =  utils.DictField(default=None) # TODO either delete or select keys
 
     def __str__(self):
         return '\n'.join([
@@ -110,6 +121,14 @@ class Runs(utils.Document):
         ])
 
 
+class JobSteps(Document):
+    name = utils.StringField()
+    status = utils.StringField()
+    conclusion = utils.StringField()
+    number = utils.IntField()
+    started_at = utils.DateTimeField(default=None)
+    completed_at = utils.DateTimeField(default=None)
+
 
 class Jobs(utils.Document):
     meta = {
@@ -123,7 +142,7 @@ class Jobs(utils.Document):
     conclusion = utils.StringField()
     started_at = utils.DateTimeField(default=None)
     completed_at = utils.DateTimeField(default=None)
-    steps = utils.ListField( utils.DictField() ) # TODO sub list data type
+    steps = EmbeddedDocumentListField(JobSteps, default=[])
     runner_id = utils.IntField(default=None)
     runner_name = utils.StringField(default=None)
     runner_group_id = utils.IntField(default=None)
@@ -307,9 +326,9 @@ class Mongo:
         repo.fork = bool( obj.get('fork') )
         repo.forks_count = int( obj.get('forks_count') )
         repo.size = int( obj.get('size') )
-        repo.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%S%z' )
-        repo.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%S%z' )
-        repo.pushed_at = dt.datetime.strptime( obj.get('pushed_at'), '%Y-%m-%dT%H:%M:%S%z' )
+        repo.created_at = self.parse_date( obj.get('created_at') )
+        repo.updated_at = self.parse_date( obj.get('updated_at') )
+        repo.pushed_at = self.parse_date( obj.get('pushed_at') )
         repo.stargazers_count = int( obj.get('stargazers_count') )
         repo.watchers_count = int( obj.get('watchers_count') )
         repo.open_issues = int( obj.get('open_issues') )
@@ -329,8 +348,8 @@ class Mongo:
         workflow.name = obj.get('name')
         workflow.path = obj.get('path')
         workflow.state = obj.get('state')
-        workflow.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%S.%f%z' )
-        workflow.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%S.%f%z' )
+        workflow.created_at = self.parse_date( obj.get('created_at'), True)
+        workflow.updated_at = self.parse_date( obj.get('updated_at'), True)
 
         return workflow
 
@@ -349,14 +368,31 @@ class Mongo:
         run.conclusion = obj.get('conclusion')
         run.workflow_id = int( obj.get('workflow_id') )
         run.pull_requests = obj.get('pull_requests')
-        run.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%S%z' )
-        run.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%S%z' )
+        run.created_at = self.parse_date( obj.get('created_at') )
+        run.updated_at = self.parse_date( obj.get('updated_at') )
         run.run_attempt = int( obj.get('run_attempt') )
         run.run_started_at = obj.get('run_started_at')
         run.head_commit = obj.get('head_commit')
         run.head_repository = obj.get('head_repository')
 
         return run
+
+
+    def __create_mongo_run_pull_request(self, obj: Optional[dict] = None) -> RunPullRequests:
+        if not obj: return None
+
+        run_pull = RunPullRequests()
+
+        run_pull.id = obj.get('id')
+        run_pull.number = obj.get('number')
+        run_pull.head_ref = obj['head'].get('ref')
+        run_pull.head_id = obj['head']['repo'].get('id')
+        run_pull.head_name = obj['head']['repo'].get('name')
+        run_pull.base_ref = obj['base'].get('ref')
+        run_pull.base_id = obj['base']['repo'].get('id')
+        run_pull.base_name = obj['base']['repo'].get('name')
+
+        return run_pull
 
 
 
@@ -371,8 +407,8 @@ class Mongo:
         job.run_attempt = int( obj.get('run_attempt') )
         job.status = obj.get('status')
         job.conclusion = obj.get('conclusion')
-        job.started_at = dt.datetime.strptime( obj.get('started_at'), '%Y-%m-%dT%H:%M:%S%z' ) if obj.get('started_at') else None
-        job.completed_at = dt.datetime.strptime( obj.get('completed_at'), '%Y-%m-%dT%H:%M:%S%z' ) if obj.get('completed_at') else None
+        job.started_at = self.parse_date( obj.get('started_at') )
+        job.completed_at = self.parse_date( obj.get('completed_at') )
         job.steps = obj.get('steps')
         job.runner_id = int( obj.get('runner_id') ) if obj.get('runner_id') else None
         job.runner_name = obj.get('runner_name')
@@ -380,6 +416,21 @@ class Mongo:
         job.runner_group_name = obj.get('runner_group_name')
 
         return job
+
+
+    def __create_mongo_job_step(self, obj: Optional[dict] = None) -> JobSteps:
+        if not obj: return None
+
+        job_step = JobSteps()
+
+        job_step.name = obj.get('name')
+        job_step.status = obj.get('status')
+        job_step.conclusion = obj.get('conclusion')
+        job_step.number = obj.get('number')
+        job_step.started_at = self.parse_date( obj.get('started_at'), True )
+        job_step.completed_at = self.parse_date( obj.get('completed_at'), True )
+
+        return job_step
 
 
 
@@ -393,8 +444,18 @@ class Mongo:
         artifact.size_in_bytes = int( obj.get('size_in_bytes') )
         artifact.archive_download_url = obj.get('archive_download_url')
         artifact.expired = bool( obj.get('expired') )
-        artifact.created_at = dt.datetime.strptime( obj.get('created_at'), '%Y-%m-%dT%H:%M:%S%z' )
-        artifact.updated_at = dt.datetime.strptime( obj.get('updated_at'), '%Y-%m-%dT%H:%M:%S%z' )
-        artifact.expires_at = dt.datetime.strptime( obj.get('expires_at'), '%Y-%m-%dT%H:%M:%S%z' )
+        artifact.created_at = self.parse_date( obj.get('created_at') )
+        artifact.updated_at = self.parse_date( obj.get('updated_at') )
+        artifact.expires_at = self.parse_date( obj.get('expires_at') )
 
         return artifact
+
+
+    def parse_date(self, value: str = None, is_millisecond: bool = False):
+        if not value:
+            return None
+
+        if is_millisecond:
+            return dt.datetime.strptime( value, '%Y-%m-%dT%H:%M:%S.%f%z' )
+        else:
+            return dt.datetime.strptime( value, '%Y-%m-%dT%H:%M:%S%z' )
