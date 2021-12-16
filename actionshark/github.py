@@ -104,21 +104,7 @@ class GitHub():
         self.total_requests += 1
         self.remaining -= 1
 
-        if basic_auth.status_code == 200:
-
-            logger.debug(f'Successfully authenticated using token')
-
-            basic_auth_json = basic_auth.json()
-
-            if verbose:
-                print('Successful Authentication:', basic_auth.status_code)
-                print(basic_auth_json['name'])
-                print(basic_auth_json['html_url'])
-                print('_'*60)
-
-            return True
-
-        else:
+        if basic_auth.status_code != 200:
 
             logger.debug(f'Error authenticated using token')
 
@@ -129,6 +115,18 @@ class GitHub():
                 print(self.api_url + 'user')
 
             return False
+
+        logger.debug(f'Successfully authenticated using token')
+
+        basic_auth_json = basic_auth.json()
+
+        if verbose:
+            print('Successful Authentication:', basic_auth.status_code)
+            print(basic_auth_json['name'])
+            print(basic_auth_json['html_url'])
+            print('_'*60)
+
+        return True
 
 
 
