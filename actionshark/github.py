@@ -307,28 +307,6 @@ class GitHub():
 
 
 
-    def get_owner_repostries(self) -> None:
-        """Fetching repositories data from GitHub API for specific owner.
-        """
-
-        self.current_action = 'repos'
-        self.page = 1
-
-        url = self.actions_url['repos'].format(org=self.owner, per_page=self.per_page)
-        github_url = self.api_url + url
-
-
-        logger.debug(f'start fetching repositories')
-
-        if self.verbose:
-            print('-'*( len(github_url)+20) )
-
-        self.paginating(github_url, None)
-
-        logger.debug(f'finish fetching repositories')
-
-
-
     def get_workflows(self) -> None:
         """Fetching workflows data from GitHub API for specific repository and owner.
         """

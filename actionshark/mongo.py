@@ -12,45 +12,6 @@ import pycoshark.utils as utils
 logger = logging.getLogger(__name__)
 
 
-class Repositories(utils.Document):
-    # to remove after finding the similar one in smartShark
-    meta = {
-        'collection': 'repositories'
-    }
-    id = utils.IntField(primary_key=True)
-    name = utils.StringField()
-    description =  utils.StringField()
-    fork = utils.BooleanField()
-    forks_count = utils.IntField()
-    size = utils.IntField()
-    created_at = utils.DateTimeField(default=None)
-    updated_at = utils.DateTimeField(default=None)
-    pushed_at = utils.DateTimeField(default=None)
-    stargazers_count = utils.IntField()
-    watchers_count = utils.IntField()
-    open_issues = utils.IntField()
-    visibility = utils.StringField()
-    topics = utils.ListField( utils.StringField() )
-
-    def __str__(self):
-        return '\n'.join([
-            f'id : {self.id}',
-            f'name : {self.name}',
-            f'description : {self.description}',
-            f'fork : {self.fork}',
-            f'forks_count : {self.forks_count}',
-            f'size : {self.size}',
-            f'created_at : {self.created_at}',
-            f'updated_at : {self.updated_at}',
-            f'pushed_at : {self.pushed_at}',
-            f'stargazers_count : {self.stargazers_count}',
-            f'watchers_count : {self.watchers_count}',
-            f'open_issues : {self.open_issues}',
-            f'visibility : {self.visibility}',
-            f'topics : {self.topics}'
-        ])
-
-
 class Workflows(utils.Document):
     meta = {
         'collection': 'workflows'
@@ -195,7 +156,6 @@ class Mongo:
 
     def __init__(self, db_user: Optional[str] = None, db_password: Optional[str] = None, db_hostname: Optional[str] = None, db_port: Optional[int] = None, db_name: Optional[str] = None, db_authentication_database: Optional[str] = None, db_ssl_enabled: bool = False, verbose: bool = False) -> None:
         self.__operations = {
-            'repos': self.__create_mongo_repo,
             'workflows': self.__create_mongo_workflow,
             'runs': self.__create_mongo_run,
             'jobs': self.__create_mongo_job,
@@ -210,11 +170,6 @@ class Mongo:
 
         logger.debug(f'Mongo connected to {db_name}')
         # logger.debug(f'Connection parameter db_user: {db_user}, db_password: {db_password}, db_hostname: {db_hostname}, db_port: {db_port}, db_authentication_database: {db_authentication_database}, db_ssl_enabled: {db_ssl_enabled},')
-
-
-    @property
-    def repositories(self):
-        return Repositories
 
 
     @property
@@ -304,39 +259,6 @@ class Mongo:
         # map and save all documents
         for document in documents:
                 func(document).save()
-
-
-
-    def __create_mongo_repo(self, obj: Optional[dict] = None) -> Repositories:
-        """Map object to the appropriate files of Repositories.
-
-        Args:
-            obj (dict): The Object to map. Defaults to None.
-
-        Returns:
-            Repositories: A MongoDB object ready to save.
-        """
-        if not obj: return None
-
-        repo = Repositories()
-
-        repo.id = int( obj.get('id') )
-        repo.name = obj.get('name')
-        repo.description = obj.get('description')
-        repo.fork = bool( obj.get('fork') )
-        repo.forks_count = int( obj.get('forks_count') )
-        repo.size = int( obj.get('size') )
-        repo.created_at = self.parse_date( obj.get('created_at') )
-        repo.updated_at = self.parse_date( obj.get('updated_at') )
-        repo.pushed_at = self.parse_date( obj.get('pushed_at') )
-        repo.stargazers_count = int( obj.get('stargazers_count') )
-        repo.watchers_count = int( obj.get('watchers_count') )
-        repo.open_issues = int( obj.get('open_issues') )
-        repo.visibility = obj.get('visibility')
-        repo.topics = obj.get('topics')
-
-        return repo
-
 
 
     def __create_mongo_workflow(self, obj: Optional[dict] = None) -> Workflows:
