@@ -238,6 +238,8 @@ class Mongo:
 
 
     def drop_database(self) -> None:
+        """Drop current connected database.
+        """
         self.__conn.drop_database(self.db_name)
         logger.debug(f'Database { self.db_name } is dropped')
 
@@ -247,75 +249,73 @@ class Mongo:
 
 
     def drop_collection(self, col_name: Optional[str] = None) -> None:
+        """Drop collection if found.
 
+        Args:
+            col_name (str): Collection name. Defaults to None.
+        """
+
+        # check if collection name is passed
         if not col_name:
             return None
 
-        if col_name in self.__conn.get_database(self.db_name).list_collection_names():
-            self.__conn.get_database(self.db_name).drop_collection(col_name)
-
-            logger.debug(f'Collection { col_name } is dropped')
-
-            if self.verbose:
-                print(f'Collection {col_name} is dropped.')
-
-        else:
+        # check if collection is in database
+        if col_name not in self.__conn.get_database(self.db_name).list_collection_names():
             logger.debug(f'Collection { col_name } is dropped')
 
             if self.verbose:
                 print(f'Collection {col_name} not found.')
 
+            return False
+
+        # Delete if found
+        self.__conn.get_database(self.db_name).drop_collection(col_name)
+
+        logger.debug(f'Collection { col_name } is dropped')
+
+        if self.verbose:
+            print(f'Collection {col_name} is dropped.')
+
+        return True
+
 
 
     def save_documents(self, documents: Optional[dict] = None, action: Optional[str] = None) -> None:
+        """Loop over Elements, to map and save. This function should be passed to GitHub instance as "save_mongo=save_documents".
 
+        Args:
+            documents (dict): Elements. Defaults to None.
+            action (str): Action name to map objects to. Defaults to None.
+        """
+
+        # check if documents and action are not None
         if not documents or not action:
             logger.debug(f'No documents or action got passed')
             return None
 
+        # check if the passed action is available
         if action not in self.__operations.keys():
             logger.debug(f'Action {action} was not found in predefined operations')
             return None
 
+        # call the mapping function
         func = self.__operations[action]
 
+        # map and save all documents
         for document in documents:
                 func(document).save()
 
 
 
-    # *DEBUGGING
-    def insert_JSON(self, file_path: Optional[str] = None, operation: Optional[str] = None) -> None:
-
-        if not file_path or not operation:
-            return None
-
-        # load the action function
-        if operation in self.__operations.keys():
-            func = self.__operations[operation]
-        else:
-            return None
-
-
-        # add all files to a list
-        if not file_path.split('.')[-1] == 'json':
-            if file_path[-1] != '/': file_path += '/'
-            files = [file_path + f for f in os.listdir(file_path)]
-        else:
-            files = [file_path]
-
-
-        # loop over all files in a directory
-        for file in files:
-            with open( file, 'r', encoding='utf-8') as data:
-                documents = json.load(data)
-
-            for document in documents:
-                func(document).save()
-
-
-
     def __create_mongo_repo(self, obj: Optional[dict] = None) -> Repositories:
+        """Map object to the appropriate files of Repositories.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            Repositories: A MongoDB object ready to save.
+        """
         if not obj: return None
 
         repo = Repositories()
@@ -340,6 +340,14 @@ class Mongo:
 
 
     def __create_mongo_workflow(self, obj: Optional[dict] = None) -> Workflows:
+        """Map object to the appropriate files of Workflows.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            Workflows: A MongoDB object ready to save.
+        """
         if not obj: return None
 
         workflow = Workflows()
@@ -356,6 +364,14 @@ class Mongo:
 
 
     def __create_mongo_run(self, obj: Optional[dict] = None) -> Runs:
+        """Map object to the appropriate files of Runs.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            Runs: A MongoDB object ready to save.
+        """
         if not obj: return None
 
         run = Runs()
@@ -379,6 +395,14 @@ class Mongo:
 
 
     def __create_mongo_run_pull_request(self, obj: Optional[dict] = None) -> RunPullRequests:
+        """Map object to the appropriate files of RunPullRequests.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            RunPullRequests: A MongoDB object ready to save.
+        """
         if not obj: return None
 
         run_pull = RunPullRequests()
@@ -397,6 +421,14 @@ class Mongo:
 
 
     def __create_mongo_job(self, obj: Optional[dict] = None) -> Jobs:
+        """Map object to the appropriate files of Jobs.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            Jobs: A MongoDB object ready to save.
+        """
         if not obj: return None
 
         job = Jobs()
@@ -419,6 +451,14 @@ class Mongo:
 
 
     def __create_mongo_job_step(self, obj: Optional[dict] = None) -> JobSteps:
+        """Map object to the appropriate files of JobSteps.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            JobSteps: A MongoDB object ready to save.
+        """
         if not obj: return None
 
         job_step = JobSteps()
@@ -435,6 +475,14 @@ class Mongo:
 
 
     def __create_mongo_artifact(self, obj: Optional[dict] = None) -> Artifacts:
+        """Map object to the appropriate files of Artifacts.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            Artifacts: A MongoDB object ready to save.
+        """
         if not obj: return None
 
         artifact = Artifacts()
@@ -452,6 +500,15 @@ class Mongo:
 
 
     def parse_date(self, value: str = None, is_millisecond: bool = False):
+        """Convert Datetime string to actual Datetime.
+
+        Args:
+            value (str): The datetime string to be converted. Defaults to None.
+            is_millisecond (bool, optional): If datetime has millisecond in the string. Defaults to False.
+
+        Returns:
+            datetime: datetime formated or None if no string passed.
+        """
         if not value:
             return None
 

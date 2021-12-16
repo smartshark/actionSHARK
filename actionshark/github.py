@@ -31,22 +31,17 @@ class GitHub():
     limit_handler_counter = 0
 
 
-    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, token: Optional[str] = None, save_mongo: Callable = None, debug_mode: bool = False, sleep_interval: int = 2, verbose: bool = True) -> None:
-        """Extract Token from settings file or environment variable for Authentication.
+    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, token: Optional[str] = None, save_mongo: Callable = None, sleep_interval: int = 2, verbose: bool = True) -> None:
+        """Initializing essential variables to use in the requests.
 
         Args:
-            owner (Optional[str], optional): [description]. Defaults to None.
-            repo (Optional[str], optional): [description]. Defaults to None.
-            per_page (int, optional): [description]. Defaults to 100.
-            save_mongo (Optional[function], optional): [description]. Defaults to None.
-            debug_mode (bool, optional): [description]. Defaults to True.
-            sleep_interval (int, optional): [description]. Defaults to 2.
-            verbose (bool, optional): [description]. Defaults to True.
+            owner (str): Owner of the repository. Defaults to None.
+            repo (str): The repository name. Defaults to None.
+            per_page (int): Number of items in a response. Defaults to 100.
+            save_mongo (callable): Callable function to save items in MongoDB. Defaults to None.
+            sleep_interval (int): Time to wait between requests in seconds. Defaults to 2.
+            verbose (bool): Print log messages to console. Defaults to True.
         """
-
-        # *DEVELOPPING
-        if debug_mode:
-            self.create_folders()
 
         # check owner and repo
         if not owner or not repo or not save_mongo:
@@ -93,10 +88,10 @@ class GitHub():
 
 
     def authenticate_user(self, verbose: bool = False):
-        """[summary]
+        """Authenticate passed token by requesting user information.
 
         Args:
-            verbose (bool, optional): [description]. Defaults to False.
+            verbose (bool, optional): [Description] . Defaults to False.
         """
 
         basic_auth = requests.get(self.api_url + 'user', headers=self.__headers)
@@ -104,12 +99,12 @@ class GitHub():
         self.total_requests += 1
         self.remaining -= 1
 
-        if basic_auth.status_code != 200:
+        # if 401 = 'Unauthorized', but other response means the use is authorized
+        if basic_auth.status_code == 401:
 
             logger.debug(f'Error authenticated using token')
 
             if verbose:
-                # 401 = 'Unauthorized'
                 print('Error Authentication:', basic_auth.status_code)
                 print(basic_auth.reason)
                 print(self.api_url + 'user')
@@ -177,9 +172,6 @@ class GitHub():
         self.last_stop_datetime = dt.datetime.now().replace(microsecond=0)
         self.force_to_sleep = (self.reset_datetime - self.last_stop_datetime).seconds
 
-        # to continue from the page when limit exceeded
-        # self.page -= 1
-
         self.limit_handler_counter += 1
 
         if self.verbose:
@@ -211,6 +203,8 @@ class GitHub():
 
 
     def update_limit_variables(self):
+        """Update limitation parameters.
+        """
         # update limit variables and error margin
         self.get_limit()
         self.remaining -= 2
@@ -227,13 +221,12 @@ class GitHub():
 
 
 
-    def paginating(self, github_url: Optional[str] = None, checker: Optional[str] = None, save_path: Optional[str] = None):
+    def paginating(self, github_url: Optional[str] = None, checker: Optional[str] = None):
         """Fetch all pages for an action and handel API limitation.
 
         Args:
-            github_url (Optional[str], optional): [description]. Defaults to None.
-            checker (Optional[str], optional): [description]. Defaults to None.
-            save_path (Optional[str], optional): [description]. Defaults to None.
+            github_url (str): GitHub API url to loop over and collect responses. Defaults to None.
+            checker (str, optional): The key to the element, who has all items. Defaults to None.
         """
 
         # case 1: limit achieved and action was not fully fetched -> stopped while paginating
@@ -314,16 +307,9 @@ class GitHub():
 
 
 
-    def get_owner_repostries(self, save_path: Optional[str] = None) -> None:
+    def get_owner_repostries(self) -> None:
         """Fetching repositories data from GitHub API for specific owner.
-
-        Args:
-            save_path (Optional[str], optional): [description]. Defaults to None.
         """
-
-        # if not save_mongo:
-        #     print('Please pass a function to save response in MongoDB.')
-        #     sys.exit(1)
 
         self.current_action = 'repos'
         self.page = 1
@@ -332,24 +318,19 @@ class GitHub():
         github_url = self.api_url + url
 
 
-        if not save_path:
-            save_path = f'./actionshark/data/repositories/{self.owner}_repos.json'
-
         logger.debug(f'start fetching repositories')
 
         if self.verbose:
             print('-'*( len(github_url)+20) )
 
-        self.paginating(github_url, None, save_path)
+        self.paginating(github_url, None)
 
         logger.debug(f'finish fetching repositories')
 
 
-    def get_workflows(self, save_path: Optional[str] = None) -> None:
-        """Fetching workflows data from GitHub API for specific repository and owner.
 
-        Args:
-            save_path (Optional[str], optional): [description]. Defaults to None.
+    def get_workflows(self) -> None:
+        """Fetching workflows data from GitHub API for specific repository and owner.
         """
 
         self.current_action = 'workflows'
@@ -358,57 +339,44 @@ class GitHub():
         url = self.actions_url['workflows'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
         github_url = self.api_url + url
 
-
-        if not save_path:
-            save_path = f'./actionshark/data/workflows/{self.owner}_{self.repo}_workflows.json'
-
         logger.debug(f'start fetching workflows')
 
         if self.verbose:
             print('-'*( len(github_url)+20) )
 
-        self.paginating(github_url, 'workflows', save_path)
+        self.paginating(github_url, 'workflows')
 
         logger.debug(f'finish fetching workflows')
 
 
 
-    def get_runs(self, exclude_pull_requests: bool = False, save_path: Optional[str] = None) -> None:
+    def get_runs(self) -> None:
         """Fetching workflow runs data from GitHub API for specific repository and owner.
-
-        Args:
-            exclude_pull_requests (bool, optional): [description]. Defaults to False.
-            save_path (Optional[str], optional): [description]. Defaults to None.
         """
 
         self.current_action = 'runs'
         self.page = 1
 
         url = self.actions_url['runs'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
-        url += f'&exclude_pull_requests={str(exclude_pull_requests)}'
+        url += f'&exclude_pull_requests=False'
         github_url = self.api_url + url
-
-
-        if not save_path:
-            save_path = f'./actionshark/data/runs/{self.owner}_{self.repo}_runs.json'
 
         logger.debug(f'start fetching runs')
 
         if self.verbose:
             print('-'*( len(github_url)+20) )
 
-        self.paginating(github_url, 'workflow_runs', save_path)
+        self.paginating(github_url, 'workflow_runs')
 
         logger.debug(f'finish fetching runs')
 
 
 
-    def get_jobs(self, run_id = None, save_path: Optional[str] = None) -> None:
+    def get_jobs(self, run_id: int = None) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
-            run_id (Optional[int], optional): [description]. Defaults to None.
-            save_path (Optional[str], optional): [description]. Defaults to None.
+            run_id (int): The run id. Defaults to None.
         """
 
         if not run_id:
@@ -421,24 +389,19 @@ class GitHub():
         url = self.actions_url['jobs'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
         github_url = self.api_url + url
 
-
-        if not save_path:
-            save_path = f'./actionshark/data/jobs/{self.owner}_{self.repo}_run_{run_id}_jobs.json'
-
         if self.verbose:
             print('-'*( len(github_url)+20) )
 
-        self.paginating(github_url, 'jobs', save_path)
+        self.paginating(github_url, 'jobs')
 
 
 
 
-    def get_artifacts(self, run_id = None, save_path: Optional[str] = None) -> None:
+    def get_artifacts(self, run_id: int = None) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
 
         Args:
-            run_id (Optional[int], optional): [description]. Defaults to None.
-            save_path (Optional[str], optional): [description]. Defaults to None.
+            run_id (int): The run id. Defaults to None.
         """
 
         if not run_id:
@@ -451,18 +414,19 @@ class GitHub():
         url = self.actions_url['artifacts'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
         github_url = self.api_url + url
 
-
-        if not save_path:
-            save_path = f'./actionshark/data/artifacts/{self.owner}_{self.repo}_run_{run_id}_artifacts.json'
-
         if self.verbose:
             print('-'*( len(github_url)+20) )
 
-        self.paginating(github_url, 'artifacts', save_path)
+        self.paginating(github_url, 'artifacts')
 
 
 
     def run(self, runs_object = None) -> None:
+        """Collect all action for a repository.
+
+        Args:
+            runs_object (Document): Runs collection to extract all run ids. Defaults to None.
+        """
 
         # verify correct token if any
         if 'Authorization' in self.__headers.keys():
@@ -499,50 +463,3 @@ class GitHub():
             for run in run_ids:
                 self.get_artifacts(run)
             logger.debug(f'Finish fetching artifacts')
-
-
-
-
-    # *DEVELOPPING
-    def create_folders(self):
-        # main data
-        if not os.path.exists('./actionshark/data'): os.mkdir('./actionshark/data')
-        # search
-        if not os.path.exists('./actionshark/data/search'): os.mkdir('./actionshark/data/search')
-        # repositories
-        if not os.path.exists('./actionshark/data/repositories'): os.mkdir('./actionshark/data/repositories')
-        # workflows
-        if not os.path.exists('./actionshark/data/workflows'): os.mkdir('./actionshark/data/workflows')
-        # runs
-        if not os.path.exists('./actionshark/data/runs'): os.mkdir('./actionshark/data/runs')
-        # jobs
-        if not os.path.exists('./actionshark/data/jobs'): os.mkdir('./actionshark/data/jobs')
-        # artifacts
-        if not os.path.exists('./actionshark/data/artifacts'): os.mkdir('./actionshark/data/artifacts')
-
-
-
-    # *DEBUGGING
-    def save_JSON(self, response: json, save_path: Optional[str] = None) -> None:
-        """Saving a JSON response from GitHub API after checking response status.
-
-        Args:
-            response (requests.models.Response): The response from GitHub API.
-            save_path (str): File name and path to where the response should be saved.
-            checker (Optional[str], optional): Key to check in JSON response in case the response is empty. Defaults to None.
-            verbose (bool): Print extra information to console.
-
-        Returns:
-            bool: True if response is not empty and saved saved successfully, otherwise False.
-        """
-
-        # add page number to the file name
-        save_path = save_path[:-5] + f'_{self.page}.json'
-
-        # save file
-        with open( save_path, 'w', encoding='utf-8') as f:
-            json.dump(response, f, indent=4)
-
-        if self.verbose:
-            print(f'Response is saved in: {save_path}')
-            print('__'*len(save_path))
