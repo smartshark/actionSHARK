@@ -1,4 +1,5 @@
 import json
+import os
 import logging
 import logging.config
 
@@ -6,6 +7,9 @@ import pycoshark.utils as utils
 from actionshark.config import Config
 from actionshark.mongo import Mongo
 from actionshark.github import GitHub
+
+if not os.path.exists("./logs"):
+    os.mkdir("./logs")
 
 
 # parsing command line arguments
@@ -89,7 +93,14 @@ def main():
         cfg.db_database,
         cfg.db_authentication,
         cfg.db_ssl,
+        cfg.url,
     )
+
+    # *DEBUGGING
+    mongo.drop_collection("workflow")
+    mongo.drop_collection("run")
+    mongo.drop_collection("job")
+    mongo.drop_collection("artifact")
 
     # initiate GitHub instance
     github = GitHub(

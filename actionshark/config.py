@@ -57,6 +57,9 @@ class Config:
             self.owner = url_parts[3]
             self.repo = url_parts[4]
 
+        else:
+            self.url = f"https://github.com/{owner}/{repo}.git"
+
     def get_logger_level(self, level: str = "DEBUG"):
 
         levels = {

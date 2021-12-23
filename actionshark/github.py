@@ -13,7 +13,7 @@ remove sleep between requests
 """
 
 # start logger
-logger = logging.getLogger("main.mongo")
+logger = logging.getLogger("main.github")
 
 
 class GitHub:
@@ -25,11 +25,10 @@ class GitHub:
     __headers = {"Accept": "application/vnd.github.v3+json"}
 
     actions_url = {
-        "repos": "orgs/{org}/repos?per_page={per_page}",
-        "workflows": "repos/{owner}/{repo}/actions/workflows?per_page={per_page}",
-        "runs": "repos/{owner}/{repo}/actions/runs?per_page={per_page}",
-        "jobs": "repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page={per_page}",
-        "artifacts": "repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page={per_page}",
+        "workflow": "repos/{owner}/{repo}/actions/workflows?per_page={per_page}",
+        "run": "repos/{owner}/{repo}/actions/runs?per_page={per_page}",
+        "job": "repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page={per_page}",
+        "artifact": "repos/{owner}/{repo}/actions/artifacts?per_page={per_page}",
     }
 
     total_requests = 0
@@ -43,7 +42,7 @@ class GitHub:
         per_page: int = 100,
         token: Optional[str] = None,
         save_mongo: Callable = None,
-        sleep_interval: int = 2,
+        sleep_interval: int = 0,
     ) -> None:
         """Initializing essential variables to use in the requests.
 
@@ -53,7 +52,6 @@ class GitHub:
             per_page (int): Number of items in a response. Defaults to 100.
             save_mongo (callable): Callable function to save items in MongoDB. Defaults to None.
             sleep_interval (int): Time to wait between requests in seconds. Defaults to 2.
-            verbose (bool): Print log messages to console. Defaults to True.
         """
 
         # check owner and repo
@@ -79,26 +77,9 @@ class GitHub:
         self.page = 1
         self.sleep_betw_requests = sleep_interval
 
-    def __str__(self) -> str:
-        return "\n".join(
-            [
-                "_" * 30,
-                "" f"Owner: {self.owner}",
-                f"Repository: {self.repo}",
-                f"API URL: {self.api_url}",
-                f"Limit requests: {self.limit}",
-                f"SleepInterval: {self.sleep_betw_requests}",
-                "_" * 30,
-                "",
-            ]
-        )
-
     def authenticate_user(self):
-        """Authenticate passed token by requesting user information.
-
-        Args:
-            verbose (bool, optional): [Description] . Defaults to False.
         """
+        Authenticate passed token by requesting user information."""
 
         basic_auth = requests.get(self.api_url + "user", headers=self.__headers)
 
@@ -201,10 +182,6 @@ class GitHub:
             # save documents to mongodb
             self.save_mongo(response_JSON, self.current_action)
 
-            # break after saving if response_count is less than per_page
-            if response_count < self.per_page:
-                break
-
             # handel page incrementing
             github_url = github_url[: -len(f"&page={self.page}")]
             self.page += 1
@@ -216,13 +193,17 @@ class GitHub:
             # updating variables to deal with limits
             self.total_requests += 1
 
+            # break after saving if response_count is less than per_page
+            if response_count < self.per_page:
+                break
+
     def get_workflows(self) -> None:
         """Fetching workflows data from GitHub API for specific repository and owner."""
 
-        self.current_action = "workflows"
+        self.current_action = "workflow"
         self.page = 1
 
-        url = self.actions_url["workflows"].format(
+        url = self.actions_url["workflow"].format(
             owner=self.owner, repo=self.repo, per_page=self.per_page
         )
         github_url = self.api_url + url
@@ -236,10 +217,10 @@ class GitHub:
     def get_runs(self) -> None:
         """Fetching workflow runs data from GitHub API for specific repository and owner."""
 
-        self.current_action = "runs"
+        self.current_action = "run"
         self.page = 1
 
-        url = self.actions_url["runs"].format(
+        url = self.actions_url["run"].format(
             owner=self.owner, repo=self.repo, per_page=self.per_page
         )
         url += f"&exclude_pull_requests=False"
@@ -264,36 +245,32 @@ class GitHub:
             )
             sys.exit(1)
 
-        self.current_action = "jobs"
+        self.current_action = "job"
         self.page = 1
 
-        url = self.actions_url["jobs"].format(
+        url = self.actions_url["job"].format(
             owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page
         )
         github_url = self.api_url + url
 
         self.paginating(github_url, "jobs")
 
-    def get_artifacts(self, run_id: int = None) -> None:
-        """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
+    def get_artifacts(self) -> None:
+        """Fetching run artifacts data from GitHub API for specific repository, owner, and run."""
 
-        Args:
-            run_id (int): The run id. Defaults to None.
-        """
-
-        if not run_id:
-            logger.error("Please make to sure to pass both the owner and repo names.")
-            sys.exit(1)
-
-        self.current_action = "artifacts"
+        self.current_action = "artifact"
         self.page = 1
 
-        url = self.actions_url["artifacts"].format(
-            owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page
+        url = self.actions_url["artifact"].format(
+            owner=self.owner, repo=self.repo, per_page=self.per_page
         )
         github_url = self.api_url + url
 
+        logger.debug(f"Start fetching artifacts")
+
         self.paginating(github_url, "artifacts")
+
+        logger.debug(f"Finish fetching artifacts")
 
     def run(self, runs_object=None) -> None:
         """Collect all action for a repository.
@@ -304,7 +281,7 @@ class GitHub:
 
         # verify correct token if any
         if self.__token:
-            if not self.authenticate_user(verbose=True):
+            if not self.authenticate_user():
                 sys.exit(1)
 
         if not self.__token:
@@ -317,7 +294,7 @@ class GitHub:
         if runs_object:
             # collect ids in a list to avoid cursor timeout
             logger.debug("Collecting run ids")
-            run_ids = [run.id for run in runs_object.objects()]
+            run_ids = [run.run_id for run in runs_object.objects()]
 
             # logger is used here to not log each time the function excutes
             logger.debug(f"Start fetching jobs")
@@ -325,7 +302,4 @@ class GitHub:
                 self.get_jobs(run)
             logger.debug(f"Finish fetching jobs")
 
-            logger.debug(f"Start fetching artifacts")
-            for run in run_ids:
-                self.get_artifacts(run)
-            logger.debug(f"Finish fetching artifacts")
+        self.get_artifacts()
