@@ -7,31 +7,44 @@ import requests
 import logging
 
 
-# start logger
-logger = logging.getLogger('main.mongo')
+"""
+change limit to when its triggered parse next reset time from header
+remove sleep between requests
+"""
 
-class GitHub():
+# start logger
+logger = logging.getLogger("main.mongo")
+
+
+class GitHub:
     """
     Managing different type of get Request to fetch data from GitHub REST API"""
 
-    api_url = 'https://api.github.com/'
+    api_url = "https://api.github.com/"
 
-    __headers = {'Accept': 'application/vnd.github.v3+json'}
+    __headers = {"Accept": "application/vnd.github.v3+json"}
 
     actions_url = {
-        'repos': 'orgs/{org}/repos?per_page={per_page}',
-        'workflows': 'repos/{owner}/{repo}/actions/workflows?per_page={per_page}',
-        'runs': 'repos/{owner}/{repo}/actions/runs?per_page={per_page}',
-        'jobs': 'repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page={per_page}',
-        'artifacts': 'repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page={per_page}'
+        "repos": "orgs/{org}/repos?per_page={per_page}",
+        "workflows": "repos/{owner}/{repo}/actions/workflows?per_page={per_page}",
+        "runs": "repos/{owner}/{repo}/actions/runs?per_page={per_page}",
+        "jobs": "repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page={per_page}",
+        "artifacts": "repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page={per_page}",
     }
 
     total_requests = 0
     current_action = None
     limit_handler_counter = 0
 
-
-    def __init__(self, owner: Optional[str] = None, repo: Optional[str] = None, per_page: int = 100, token: Optional[str] = None, save_mongo: Callable = None, sleep_interval: int = 2) -> None:
+    def __init__(
+        self,
+        owner: Optional[str] = None,
+        repo: Optional[str] = None,
+        per_page: int = 100,
+        token: Optional[str] = None,
+        save_mongo: Callable = None,
+        sleep_interval: int = 2,
+    ) -> None:
         """Initializing essential variables to use in the requests.
 
         Args:
@@ -45,13 +58,15 @@ class GitHub():
 
         # check owner and repo
         if not owner or not repo or not save_mongo:
-            logger.error(f'Please make to sure to pass owner and repo names and save_mongo function.')
+            logger.error(
+                f"Please make to sure to pass owner and repo names and save_mongo function."
+            )
             sys.exit(1)
 
         # add token to header
         self.__token = None
         if token:
-            self.__headers['Authorization'] = f'token {token}'
+            self.__headers["Authorization"] = f"token {token}"
             self.__token = token
 
         # MongoDB
@@ -64,26 +79,19 @@ class GitHub():
         self.page = 1
         self.sleep_betw_requests = sleep_interval
 
-        # initiate limit variables
-        self.get_limit()
-
-
-
     def __str__(self) -> str:
-        return '\n'.join([
-            "_"*30, ""
-            f"Owner: {self.owner}",
-            f"Repository: {self.repo}",
-            f"API URL: {self.api_url}",
-            f"Limit requests: {self.limit}",
-            f"Remaining requests: {self.remaining}",
-            f"Next Reset: {self.reset_datetime}",
-            f"Last Stop: {self.last_stop_datetime}",
-            f"SleepInterval: {self.sleep_betw_requests}",
-            "_"*30, ""
-        ])
-
-
+        return "\n".join(
+            [
+                "_" * 30,
+                "" f"Owner: {self.owner}",
+                f"Repository: {self.repo}",
+                f"API URL: {self.api_url}",
+                f"Limit requests: {self.limit}",
+                f"SleepInterval: {self.sleep_betw_requests}",
+                "_" * 30,
+                "",
+            ]
+        )
 
     def authenticate_user(self):
         """Authenticate passed token by requesting user information.
@@ -92,92 +100,27 @@ class GitHub():
             verbose (bool, optional): [Description] . Defaults to False.
         """
 
-        basic_auth = requests.get(self.api_url + 'user', headers=self.__headers)
+        basic_auth = requests.get(self.api_url + "user", headers=self.__headers)
 
         self.total_requests += 1
-        self.remaining -= 1
 
         # if 401 = 'Unauthorized', but other response means the use is authorized
         if basic_auth.status_code == 401:
 
-            logger.error(f'Error authenticated using token')
-            logger.error('Authentication status_code:', basic_auth.status_code)
+            logger.error(f"Error authenticated using token")
+            logger.error("Authentication status_code:", basic_auth.status_code)
             logger.error(basic_auth.reason)
-            logger.error(self.api_url + 'user')
+            logger.error(self.api_url + "user")
 
             return False
 
-        logger.debug(f'Successfully authenticated using token')
+        logger.debug(f"Successfully authenticated using token")
 
         return True
 
-
-
-    def get_dt_now(self) -> dt:
-        return dt.datetime.now().replace(microsecond=0)
-
-
-
-    def get_limit(self):
-        """Collect limitation parameters.
-
-        Args:
-            verbose (bool, optional): [description]. Defaults to False.
-        """
-
-        response = requests.get(self.api_url + 'rate_limit', headers=self.__headers)
-
-        if response.status_code != 200:
-            self.remaining = 0
-            self.reset_datetime = self.get_dt_now()
-
-            logger.error('limit and quota', response.status_code)
-            logger.error(response.reason)
-
-
-        temp = response.json()['resources']['core']
-        self.remaining = temp["remaining"]
-        self.reset_datetime = dt.datetime.fromtimestamp(temp["reset"])
-        self.last_stop_datetime = self.get_dt_now()
-
-        # add error margin
-        self.remaining -= 2
-        self.reset_datetime += dt.timedelta(seconds=2)
-
-        logger.debug(f'Updating limit handler variables')
-        logger.debug(f'limit variable remaining: {self.remaining}')
-        logger.debug(f'limit variable reset_datetime: {self.reset_datetime}')
-        logger.debug(f'Finished limit handler variables')
-
-
-
-    def limit_handler(self) -> None:
-        """Handel limitation by sleeping till next reset time.
-        """
-
-        # 401 = 'Unauthorized'
-        # 403 = 'rate limit exceeded'
-
-        self.last_stop_datetime = dt.datetime.now().replace(microsecond=0)
-        self.force_to_sleep = (self.reset_datetime - self.last_stop_datetime).seconds
-
-        self.limit_handler_counter += 1
-
-        logger.debug(f'Limit handler is triggered')
-        logger.debug(f'Program will sleep for approximately {self.force_to_sleep:n} seconds.')
-        logger.debug(f'Next Restart will be on {self.reset_datetime.time()}')
-
-        # long sleep till limit reset
-        sleep(self.force_to_sleep)
-
-        # update limit variables
-        self.get_limit()
-
-        logger.debug(f'Continue with {self.current_action} from page {self.page}')
-
-
-
-    def paginating(self, github_url: Optional[str] = None, checker: Optional[str] = None):
+    def paginating(
+        self, github_url: Optional[str] = None, checker: Optional[str] = None
+    ):
         """Fetch all pages for an action and handel API limitation.
 
         Args:
@@ -192,29 +135,62 @@ class GitHub():
 
         while True:
             # append page number to url
-            github_url += f'&page={self.page}'
+            github_url += f"&page={self.page}"
 
             # get response
             response = requests.get(github_url, headers=self.__headers)
 
+            self.total_requests += 1
+
             # Abort if unknown error occurred
             if response.status_code != 200 and response.status_code != 403:
-                logger.error(f'Error in request status_code: {response.status_code}')
-                logger.error(f'Error in request github_url: {github_url}')
+                logger.error(f"Error in request status_code: {response.status_code}")
+                logger.error(f"Error in request github_url: {github_url}")
                 logger.error(response)
                 sys.exit(1)
 
             # handel case: limit achieved and action was not fully fetched -> stopped while paginating
             # handel case: got response but was last action page and last remaining the same time
-            if response.status_code == 403 or self.remaining < 1:
-                self.limit_handler()
-                # skip current loop with same action and page
+            if response.status_code == 403:
+
+                headers_dict = response.headers
+
+                reset_time = dt.datetime.fromtimestamp(
+                    int(headers_dict.get("X-RateLimit-Reset"))
+                )
+
+                current_time = dt.datetime.strptime(
+                    headers_dict.get("Date"), "%a, %d %b %Y %H:%M:%S %Z"
+                )
+
+                sleep_time = (current_time - reset_time).seconds
+
+                self.limit_handler_counter += 1
+
+                logger.debug(f"Limit handler is triggered")
+                logger.debug(
+                    f"Program will sleep for approximately {sleep_time:n} seconds."
+                )
+                logger.debug(
+                    f"Next Restart will be on {reset_time + dt.timedelta(hours=1)}"
+                )
+
+                # long sleep till limit reset
+                sleep(sleep_time)
+
+                # update limit variables
+                self.get_limit()
+
+                logger.debug(
+                    f"Continue with {self.current_action} from page {self.page}"
+                )
                 continue
 
             # check if key is not empty
             response_JSON = response.json()
             if checker:
                 response_JSON = response_JSON.get(checker)
+
             # count number of documents
             response_count = len(response_JSON)
 
@@ -230,59 +206,50 @@ class GitHub():
                 break
 
             # handel page incrementing
-            github_url = github_url[:-len(f'&page={self.page}')]
+            github_url = github_url[: -len(f"&page={self.page}")]
             self.page += 1
 
             # sleep between requests
-            sleep(self.sleep_betw_requests)
+            # if self.total_requests % 10 == 0:
+            #     sleep(self.sleep_betw_requests)
 
             # updating variables to deal with limits
             self.total_requests += 1
-            self.remaining -= 1
-
-            # handel case: limit was not reached and an hour passed -> reset limit variables
-            if (self.get_dt_now() - dt.timedelta(hours=1) ) >= self.last_stop_datetime:
-                logger.debug('Hour passed without hitting the limit')
-                self.get_limit()
-
-
 
     def get_workflows(self) -> None:
-        """Fetching workflows data from GitHub API for specific repository and owner.
-        """
+        """Fetching workflows data from GitHub API for specific repository and owner."""
 
-        self.current_action = 'workflows'
+        self.current_action = "workflows"
         self.page = 1
 
-        url = self.actions_url['workflows'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
+        url = self.actions_url["workflows"].format(
+            owner=self.owner, repo=self.repo, per_page=self.per_page
+        )
         github_url = self.api_url + url
 
-        logger.debug(f'Start fetching workflows')
+        logger.debug(f"Start fetching workflows")
 
-        self.paginating(github_url, 'workflows')
+        self.paginating(github_url, "workflows")
 
-        logger.debug(f'Finish fetching workflows')
-
-
+        logger.debug(f"Finish fetching workflows")
 
     def get_runs(self) -> None:
-        """Fetching workflow runs data from GitHub API for specific repository and owner.
-        """
+        """Fetching workflow runs data from GitHub API for specific repository and owner."""
 
-        self.current_action = 'runs'
+        self.current_action = "runs"
         self.page = 1
 
-        url = self.actions_url['runs'].format(owner=self.owner, repo=self.repo, per_page=self.per_page)
-        url += f'&exclude_pull_requests=False'
+        url = self.actions_url["runs"].format(
+            owner=self.owner, repo=self.repo, per_page=self.per_page
+        )
+        url += f"&exclude_pull_requests=False"
         github_url = self.api_url + url
 
-        logger.debug(f'Start fetching runs')
+        logger.debug(f"Start fetching runs")
 
-        self.paginating(github_url, 'workflow_runs')
+        self.paginating(github_url, "workflow_runs")
 
-        logger.debug(f'Finish fetching runs')
-
-
+        logger.debug(f"Finish fetching runs")
 
     def get_jobs(self, run_id: int = None) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
@@ -292,19 +259,20 @@ class GitHub():
         """
 
         if not run_id:
-            logger.error('Please make to sure to pass the owner, repo name, and run id.')
+            logger.error(
+                "Please make to sure to pass the owner, repo name, and run id."
+            )
             sys.exit(1)
 
-        self.current_action = 'jobs'
+        self.current_action = "jobs"
         self.page = 1
 
-        url = self.actions_url['jobs'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
+        url = self.actions_url["jobs"].format(
+            owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page
+        )
         github_url = self.api_url + url
 
-        self.paginating(github_url, 'jobs')
-
-
-
+        self.paginating(github_url, "jobs")
 
     def get_artifacts(self, run_id: int = None) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
@@ -314,20 +282,20 @@ class GitHub():
         """
 
         if not run_id:
-            logger.error('Please make to sure to pass both the owner and repo names.')
+            logger.error("Please make to sure to pass both the owner and repo names.")
             sys.exit(1)
 
-        self.current_action = 'artifacts'
+        self.current_action = "artifacts"
         self.page = 1
 
-        url = self.actions_url['artifacts'].format(owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page)
+        url = self.actions_url["artifacts"].format(
+            owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page
+        )
         github_url = self.api_url + url
 
-        self.paginating(github_url, 'artifacts')
+        self.paginating(github_url, "artifacts")
 
-
-
-    def run(self, runs_object = None) -> None:
+    def run(self, runs_object=None) -> None:
         """Collect all action for a repository.
 
         Args:
@@ -340,7 +308,7 @@ class GitHub():
                 sys.exit(1)
 
         if not self.__token:
-            logger.debug(f'Proceding without token')
+            logger.debug(f"Proceding without token")
 
         self.get_workflows()
         self.get_runs()
@@ -348,18 +316,16 @@ class GitHub():
         # if Runs object was passed, for each Run get
         if runs_object:
             # collect ids in a list to avoid cursor timeout
-            logger.debug('Collecting run ids')
+            logger.debug("Collecting run ids")
             run_ids = [run.id for run in runs_object.objects()]
 
-
             # logger is used here to not log each time the function excutes
-            logger.debug(f'Start fetching jobs')
+            logger.debug(f"Start fetching jobs")
             for run in run_ids:
                 self.get_jobs(run)
-            logger.debug(f'Finish fetching jobs')
+            logger.debug(f"Finish fetching jobs")
 
-
-            logger.debug(f'Start fetching artifacts')
+            logger.debug(f"Start fetching artifacts")
             for run in run_ids:
                 self.get_artifacts(run)
-            logger.debug(f'Finish fetching artifacts')
+            logger.debug(f"Finish fetching artifacts")
