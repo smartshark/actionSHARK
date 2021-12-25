@@ -96,12 +96,6 @@ def main():
         cfg.url,
     )
 
-    # *DEBUGGING
-    mongo.drop_collection("workflow")
-    mongo.drop_collection("run")
-    mongo.drop_collection("job")
-    mongo.drop_collection("artifact")
-
     # initiate GitHub instance
     github = GitHub(
         owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents
