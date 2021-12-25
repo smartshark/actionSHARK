@@ -42,7 +42,6 @@ class GitHub:
         per_page: int = 100,
         token: Optional[str] = None,
         save_mongo: Callable = None,
-        sleep_interval: int = 0,
     ) -> None:
         """Initializing essential variables to use in the requests.
 
@@ -75,7 +74,6 @@ class GitHub:
         self.repo = repo
         self.per_page = per_page
         self.page = 1
-        self.sleep_betw_requests = sleep_interval
 
     def authenticate_user(self):
         """
@@ -140,11 +138,9 @@ class GitHub:
                     int(headers_dict.get("X-RateLimit-Reset"))
                 )
 
-                current_time = dt.datetime.strptime(
-                    headers_dict.get("Date"), "%a, %d %b %Y %H:%M:%S %Z"
-                )
+                current_time = dt.datetime.now().replace(microsecond=0)
 
-                sleep_time = (current_time - reset_time).seconds
+                sleep_time = (reset_time - current_time).seconds
 
                 self.limit_handler_counter += 1
 
@@ -152,18 +148,13 @@ class GitHub:
                 logger.debug(
                     f"Program will sleep for approximately {sleep_time:n} seconds."
                 )
-                logger.debug(
-                    f"Next Restart will be on {reset_time + dt.timedelta(hours=1)}"
-                )
+                logger.debug(f"Next Restart will be on {reset_time}")
 
                 # long sleep till limit reset
                 sleep(sleep_time)
 
-                # update limit variables
-                self.get_limit()
-
                 logger.debug(
-                    f"Continue with {self.current_action} from page {self.page}"
+                    f"Continue with fetching {self.current_action} from last GET request"
                 )
                 continue
 
@@ -185,10 +176,6 @@ class GitHub:
             # handel page incrementing
             github_url = github_url[: -len(f"&page={self.page}")]
             self.page += 1
-
-            # sleep between requests
-            # if self.total_requests % 10 == 0:
-            #     sleep(self.sleep_betw_requests)
 
             # updating variables to deal with limits
             self.total_requests += 1
@@ -288,6 +275,7 @@ class GitHub:
             logger.debug(f"Proceding without token")
 
         self.get_workflows()
+        self.get_artifacts()
         self.get_runs()
 
         # if Runs object was passed, for each Run get
@@ -301,5 +289,3 @@ class GitHub:
             for run in run_ids:
                 self.get_jobs(run)
             logger.debug(f"Finish fetching jobs")
-
-        self.get_artifacts()
