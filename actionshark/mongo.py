@@ -199,8 +199,6 @@ class Mongo:
         # call the mapping function
         func = self.__operations[action]
 
-        to_save = []
-
         # map and save all documents
         for document in documents:
 
@@ -210,16 +208,7 @@ class Mongo:
                 logger.error(
                     f'Failed saving document action:{action}, id:{document["id"]}'
                 )
-                to_save.append(document)
                 continue
-
-        if to_save:
-            with open(
-                f"./actionshark/failed_to_save/{action}_{document['id']}.json",
-                "w",
-                encoding="utf-8",
-            ) as f:
-                json.dump(to_save, f)
 
     def __create_embedded_docs(
         self,
@@ -437,14 +426,11 @@ class Mongo:
         except Workflow.DoesNotExist:
             r = None
 
-        if not r:
-            try:
-                r = Workflow.objects.get(name=v_name).id
-            except Workflow.DoesNotExist:
-                # logger.error(
-                #     f"Workflow not found, workflow_id:{v_workflow_id}, name:{v_name}"
-                # )
-                r = None
+        # if not r:
+        #     try:
+        #         r = Workflow.objects.get(name=v_name).id
+        #     except Workflow.DoesNotExist:
+        #         r = None
 
         # create workflow if not found by name or id
         if not r:
@@ -455,6 +441,9 @@ class Mongo:
         try:
             r = Workflow.objects.get(workflow_id=v_workflow_id).id
         except Workflow.DoesNotExist:
+            logger.error(
+                f"Workflow not found, workflow_id:{v_workflow_id}, name:{v_name}"
+            )
             r = None
 
         return r
