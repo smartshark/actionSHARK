@@ -1,10 +1,10 @@
 import datetime as dt
 from typing import Optional, Any, Union
 import logging
+import json
 
 from pycoshark.utils import create_mongodb_uri_string
 from pycoshark.mongomodels import (
-    Project,
     PullRequest,
     VCSSystem,
 )
@@ -29,14 +29,14 @@ logger = logging.getLogger("main.mongo")
 
 
 class Workflow(Document):
-    workflow_id = IntField()
-    name = StringField()
-    path = StringField()
-    state = StringField()
+    workflow_id = IntField(default=None)
+    name = StringField(default=None)
+    path = StringField(default=None)
+    state = StringField(default=None)
     created_at = DateTimeField(default=None)
     updated_at = DateTimeField(default=None)
-    repo_id = ObjectIdField(default=None)  # TODO link to vcsShark
-    repo_url = StringField()
+    repo_id = ObjectIdField(default=None)
+    repo_url = StringField(default=None)
 
 
 class RunPullRequest(EmbeddedDocument):
@@ -58,7 +58,7 @@ class Run(Document):
     status = StringField()
     conclusion = StringField()
     workflow_id = ObjectIdField(default=None)
-    workflow_id_int = IntField()
+    workflow_github_id = IntField()
     pull_requests = EmbeddedDocumentListField(RunPullRequest, default=[])
     created_at = DateTimeField(default=None)
     updated_at = DateTimeField(default=None)
@@ -82,7 +82,7 @@ class JobStep(EmbeddedDocument):
 class Job(Document):
     job_id = IntField()
     name = StringField()
-    run_id = ObjectIdField()
+    run_id = ObjectIdField(default=None)
     run_attempt = IntField()
     status = StringField()
     conclusion = StringField()
@@ -166,11 +166,8 @@ class Mongo:
             col_name
             not in self.__conn.get_database(self.db_name).list_collection_names()
         ):
-            logger.error(f"Collection { col_name } is dropped")
+            logger.error(f"Collection { col_name } is Not Found")
             return False
-
-        for _ in self.__conn.get_database(self.db_name).list_collection_names():
-            print(_)
 
         # Delete if found
         self.__conn.get_database(self.db_name).drop_collection(col_name)
@@ -202,6 +199,8 @@ class Mongo:
         # call the mapping function
         func = self.__operations[action]
 
+        to_save = []
+
         # map and save all documents
         for document in documents:
 
@@ -211,7 +210,16 @@ class Mongo:
                 logger.error(
                     f'Failed saving document action:{action}, id:{document["id"]}'
                 )
+                to_save.append(document)
                 continue
+
+        if to_save:
+            with open(
+                f"./actionshark/failed_to_save/{action}_{document['id']}.json",
+                "w",
+                encoding="utf-8",
+            ) as f:
+                json.dump(to_save, f)
 
     def __create_embedded_docs(
         self,
@@ -282,8 +290,10 @@ class Mongo:
         run.event = obj.get("event")
         run.status = obj.get("status")
         run.conclusion = obj.get("conclusion")
-        run.workflow_id = self.__workflow_object_id(int(obj.get("workflow_id")))
-        run.workflow_id_int = int(obj.get("workflow_id"))
+        run.workflow_id = self.__workflow_object_id(
+            v_workflow_id=int(obj.get("workflow_id")), v_name=obj.get("name")
+        )
+        run.workflow_github_id = int(obj.get("workflow_id"))
         run.pull_requests = self.__create_embedded_docs(
             "run_pull_request", obj.get("pull_requests")
         )
@@ -419,11 +429,48 @@ class Mongo:
         else:
             return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S%z")
 
-    def __workflow_object_id(self, v: Union[str, int] = 0) -> str:
-        return Workflow.objects.get(workflow_id=v).id
+    def __workflow_object_id(
+        self, v_workflow_id: Optional[int] = None, v_name: Optional[str] = None
+    ) -> str:
+        try:
+            r = Workflow.objects.get(workflow_id=v_workflow_id).id
+        except Workflow.DoesNotExist:
+            r = None
 
-    def __repo_object_id(self, v: Union[str, int] = 0) -> str:
-        return VCSSystem.objects.get(url=v).project_id
+        if not r:
+            try:
+                r = Workflow.objects.get(name=v_name).id
+            except Workflow.DoesNotExist:
+                # logger.error(
+                #     f"Workflow not found, workflow_id:{v_workflow_id}, name:{v_name}"
+                # )
+                r = None
 
-    def __run_object_id(self, v: Union[str, int] = 0) -> str:
-        return Run.objects.get(run_id=v).id
+        # create workflow if not found by name or id
+        if not r:
+            self.__create_workflow(
+                {"id": v_workflow_id, "name": v_name, "state": "deleted"}
+            ).save()
+
+        try:
+            r = Workflow.objects.get(workflow_id=v_workflow_id).id
+        except Workflow.DoesNotExist:
+            r = None
+
+        return r
+
+    def __repo_object_id(self, value: Optional[str] = None) -> str:
+        try:
+            r = VCSSystem.objects.get(url=value).project_id
+        except VCSSystem.DoesNotExist:
+            logger.error(f"VCSSystem not found url:{value}")
+            r = None
+        return r
+
+    def __run_object_id(self, value: Optional[int] = None) -> str:
+        try:
+            r = Run.objects.get(run_id=value).id
+        except Run.DoesNotExist:
+            logger.error(f"Run not found run_id:{value}")
+            r = None
+        return r
