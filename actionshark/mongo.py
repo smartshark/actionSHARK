@@ -1,24 +1,19 @@
 import datetime as dt
-from typing import Optional, Any, Union
+from typing import Optional, Any
 import logging
-import json
+from mongoengine.fields import EmbeddedDocumentField
 
 from pycoshark.utils import create_mongodb_uri_string
-from pycoshark.mongomodels import (
-    PullRequest,
-    VCSSystem,
-)
+from pycoshark.mongomodels import VCSSystem
 
 from mongoengine import connect
 from mongoengine import (
     Document,
     StringField,
-    ListField,
     DateTimeField,
     IntField,
     BooleanField,
     ObjectIdField,
-    DictField,
     EmbeddedDocument,
     EmbeddedDocumentListField,
 )
@@ -50,24 +45,32 @@ class RunPullRequest(EmbeddedDocument):
     base_name = StringField(default=None)
 
 
+class RunHeadCommit(EmbeddedDocument):
+    message = StringField(default=None)
+    timestamp = DateTimeField(default=None)
+
+
+class RunHeadRepository(EmbeddedDocument):
+    full_name = StringField(default=None)
+    repo_id = ObjectIdField(default=None)
+
+
 class Run(Document):
-    run_id = IntField()
-    name = StringField()
-    run_number = IntField()
+    run_id = IntField(default=None)
+    name = StringField(default=None)
+    run_number = IntField(default=None)
     event = StringField(required=True)
-    status = StringField()
-    conclusion = StringField()
+    status = StringField(default=None)
+    conclusion = StringField(default=None)
     workflow_id = ObjectIdField(default=None)
-    workflow_github_id = IntField()
+    workflow_github_id = IntField(default=None)
     pull_requests = EmbeddedDocumentListField(RunPullRequest, default=[])
     created_at = DateTimeField(default=None)
     updated_at = DateTimeField(default=None)
     run_attempt = IntField(default=None)
     run_started_at = DateTimeField(default=None)
-    # TODO either delete or select keys
-    head_commit = DictField(default=None)
-    # TODO either delete or select keys
-    head_repository = DictField(default=None)
+    head_repository = EmbeddedDocumentField(RunHeadRepository, default=None)
+    head_commit = EmbeddedDocumentField(RunHeadCommit, default=None)
 
 
 class JobStep(EmbeddedDocument):
@@ -80,12 +83,12 @@ class JobStep(EmbeddedDocument):
 
 
 class Job(Document):
-    job_id = IntField()
-    name = StringField()
+    job_id = IntField(default=None)
+    name = StringField(default=None)
     run_id = ObjectIdField(default=None)
-    run_attempt = IntField()
-    status = StringField()
-    conclusion = StringField()
+    run_attempt = IntField(default=None)
+    status = StringField(default=None)
+    conclusion = StringField(default=None)
     started_at = DateTimeField(default=None)
     completed_at = DateTimeField(default=None)
     steps = EmbeddedDocumentListField(JobStep, default=[])
@@ -96,10 +99,10 @@ class Job(Document):
 
 
 class Artifact(Document):
-    artifact_id = IntField()
-    name = StringField()
-    size_in_bytes = IntField()
-    archive_download_url = StringField()
+    artifact_id = IntField(default=None)
+    name = StringField(default=None)
+    size_in_bytes = IntField(default=None)
+    archive_download_url = StringField(default=None)
     expired = BooleanField()
     created_at = DateTimeField(default=None)
     updated_at = DateTimeField(default=None)
@@ -193,7 +196,8 @@ class Mongo:
 
         # check if the passed action is available
         if action not in self.__operations.keys():
-            logger.error(f"Action {action} was not found in predefined operations")
+            logger.error(
+                f"Action {action} was not found in predefined operations")
             return None
 
         # call the mapping function
@@ -280,18 +284,18 @@ class Mongo:
         run.status = obj.get("status")
         run.conclusion = obj.get("conclusion")
         run.workflow_id = self.__workflow_object_id(
-            v_workflow_id=int(obj.get("workflow_id")), v_name=obj.get("name")
-        )
+            v_workflow_id=int(obj.get("workflow_id")), v_name=obj.get("name"))
         run.workflow_github_id = int(obj.get("workflow_id"))
         run.pull_requests = self.__create_embedded_docs(
-            "run_pull_request", obj.get("pull_requests")
-        )
+            "run_pull_request", obj.get("pull_requests"))
         run.created_at = self.__parse_date(obj.get("created_at"))
         run.updated_at = self.__parse_date(obj.get("updated_at"))
         run.run_attempt = int(obj.get("run_attempt"))
         run.run_started_at = obj.get("run_started_at")
-        run.head_commit = obj.get("head_commit")
-        run.head_repository = obj.get("head_repository")
+        run.head_repository = self.__create_run_head_repo(
+            obj.get("head_repository"))
+        run.head_commit = self.__create_run_head_commit(
+            obj.get("head_commit"))
 
         return run
 
@@ -320,6 +324,46 @@ class Mongo:
 
         return run_pull
 
+    def __create_run_head_commit(self, obj: Optional[dict] = None) -> RunHeadCommit:
+        """Map object to the appropriate files of RunHeadCommit.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            RunHeadCommit: A MongoDB object ready to save.
+        """
+        if not obj:
+            return None
+
+        run_head_commit = RunHeadCommit()
+
+        run_head_commit.message = obj.get("message")
+        run_head_commit.timestamp = self.__parse_date(
+            obj.get("timestamp"))
+
+        return run_head_commit
+
+    def __create_run_head_repo(self, obj: Optional[dict] = None) -> RunHeadRepository:
+        """Map object to the appropriate files of RunHeadRepository.
+
+        Args:
+            obj (dict): The Object to map. Defaults to None.
+
+        Returns:
+            RunHeadRepository: A MongoDB object ready to save.
+        """
+        if not obj:
+            return None
+
+        run_head_repo = RunHeadRepository()
+
+        run_head_repo.full_name = obj.get("full_name")
+        run_head_repo.repo_id = self.__head_commit_object_id(
+            obj.get("full_name"))
+
+        return run_head_repo
+
     def __create_job(self, obj: Optional[dict] = None) -> Job:
         """Map object to the appropriate files of Jobs.
 
@@ -343,10 +387,12 @@ class Mongo:
         job.started_at = self.__parse_date(obj.get("started_at"))
         job.completed_at = self.__parse_date(obj.get("completed_at"))
         job.steps = self.__create_embedded_docs("job_step", obj.get("steps"))
-        job.runner_id = int(obj.get("runner_id")) if obj.get("runner_id") else None
+        job.runner_id = int(obj.get("runner_id")) if obj.get(
+            "runner_id") else None
         job.runner_name = obj.get("runner_name")
         job.runner_group_id = (
-            int(obj.get("runner_group_id")) if obj.get("runner_group_id") else None
+            int(obj.get("runner_group_id")) if obj.get(
+                "runner_group_id") else None
         )
         job.runner_group_name = obj.get("runner_group_name")
 
@@ -369,9 +415,11 @@ class Mongo:
         job_step.name = obj.get("name")
         job_step.status = obj.get("status")
         job_step.conclusion = obj.get("conclusion")
-        job_step.number = int(obj.get("number")) if not obj.get("number") else None
+        job_step.number = int(obj.get("number")) if not obj.get(
+            "number") else None
         job_step.started_at = self.__parse_date(obj.get("started_at"), True)
-        job_step.completed_at = self.__parse_date(obj.get("completed_at"), True)
+        job_step.completed_at = self.__parse_date(
+            obj.get("completed_at"), True)
 
         return job_step
 
@@ -418,14 +466,18 @@ class Mongo:
         else:
             return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S%z")
 
-    def __workflow_object_id(
-        self, v_workflow_id: Optional[int] = None, v_name: Optional[str] = None
-    ) -> str:
+    def __workflow_object_id(self, v_workflow_id: Optional[int] = None, v_name: Optional[str] = None) -> str:
+
+        if not v_workflow_id or not v_name:
+            return None
+
         try:
             r = Workflow.objects.get(workflow_id=v_workflow_id).id
         except Workflow.DoesNotExist:
             r = None
 
+        # check workflow by name, when it has different id
+        # like when a workflow get updated with the same name
         # if not r:
         #     try:
         #         r = Workflow.objects.get(name=v_name).id
@@ -449,6 +501,10 @@ class Mongo:
         return r
 
     def __repo_object_id(self, value: Optional[str] = None) -> str:
+
+        if not value:
+            return None
+
         try:
             r = VCSSystem.objects.get(url=value).project_id
         except VCSSystem.DoesNotExist:
@@ -456,7 +512,23 @@ class Mongo:
             r = None
         return r
 
+    def __head_commit_object_id(self, value: Optional[str] = None) -> str:
+
+        if not value:
+            return None
+
+        value = "https://github.com/" + value + ".git"
+        try:
+            r = VCSSystem.objects.get(url=value).project_id
+        except VCSSystem.DoesNotExist:
+            r = None
+        return r
+
     def __run_object_id(self, value: Optional[int] = None) -> str:
+
+        if not value:
+            return None
+
         try:
             r = Run.objects.get(run_id=value).id
         except Run.DoesNotExist:

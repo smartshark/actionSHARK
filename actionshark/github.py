@@ -79,7 +79,8 @@ class GitHub:
         """
         Authenticate passed token by requesting user information."""
 
-        basic_auth = requests.get(self.api_url + "user", headers=self.__headers)
+        basic_auth = requests.get(
+            self.api_url + "user", headers=self.__headers)
 
         self.total_requests += 1
 
@@ -122,8 +123,9 @@ class GitHub:
             self.total_requests += 1
 
             # Abort if unknown error occurred
-            if response.status_code != 200 and response.status_code != 403:
-                logger.error(f"Error in request status_code: {response.status_code}")
+            if response.status_code not in [200, 403]:
+                logger.error(
+                    f"Error in request status_code: {response.status_code}")
                 logger.error(f"Error in request github_url: {github_url}")
                 logger.error(response)
                 sys.exit(1)

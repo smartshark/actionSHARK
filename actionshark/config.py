@@ -1,9 +1,7 @@
 import os
 import logging
-
-
-# start logger
-logger = logging.getLogger("main.config")
+import json
+import datetime as dt
 
 
 class Config:
@@ -24,8 +22,6 @@ class Config:
         # if environment variable passed and not concrete token
         if not self.token and args.token_env:
             self.token = os.environ.get(args.token_env)
-
-        logger.debug("Arguments mapped")
 
     def __str__(self):
         return "\n".join(
@@ -62,16 +58,30 @@ class Config:
 
     def get_logger_level(self, level: str = "DEBUG"):
 
-        levels = {
-            "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL,
-        }
+        levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
         # defult level to DEBUG
-        if level not in levels.keys():
+        if level not in levels:
             level = "DEBUG"
 
-        return levels[level]
+        return level
+
+
+def init_logger(level):
+    # load logger configuration
+    with open("./logger_config.json", "r") as f:
+        logging_cfg = json.load(f)
+
+    curr_time = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d_%H-%M-%S')
+
+    # add date and time to log file name
+    logging_cfg["handlers"][
+        "debug"]["filename"] = logging_cfg["handlers"]["debug"]["filename"].replace(
+        ".log", f"_{curr_time}.log")
+    logging_cfg["handlers"]["error"]["filename"] = logging_cfg["handlers"]["error"]["filename"].replace(
+        ".log", f"{curr_time}.log")
+
+    logging_cfg["loggers"]["main"]["level"] = level
+
+    # load logging configuration
+    logging.config.dictConfig(logging_cfg)

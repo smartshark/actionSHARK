@@ -1,13 +1,13 @@
-import json
 import os
 import logging
 import logging.config
 
 import pycoshark.utils as utils
-from actionshark.config import Config
+from actionshark.config import Config, init_logger
 from actionshark.mongo import Mongo
 from actionshark.github import GitHub
 
+# create logs folder
 if not os.path.exists("./logs"):
     os.mkdir("./logs")
 
@@ -69,20 +69,16 @@ def collect_args():
     return parser.parse_args()
 
 
-# load logger configuration
-with open("./logger_config.json", "r") as f:
-    logging.config.dictConfig(json.load(f))
-
-
 # main function
 def main():
-    # Start logger
-    logger = logging.getLogger("main")
-    logger.debug("Start Logging")
-
     # collect args from terminal to cfg variable
     args = collect_args()
     cfg = Config(args)
+
+    # Start logger
+    init_logger(cfg.logger_level)
+    logger = logging.getLogger("main")
+    logger.debug("Start Logging")
 
     # initiate mongo instance
     mongo = Mongo(
