@@ -14,7 +14,7 @@
             "formatter": "simple",
             "stream": "ext://sys.stdout"
         },
-        "file_handler_debug": {
+        "debug": {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "DEBUG",
             "formatter": "simple",
@@ -23,7 +23,7 @@
             "backupCount": 10,
             "encoding": "utf8"
         },
-        "file_handler_error": {
+        "error": {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "ERROR",
             "formatter": "simple",
@@ -37,8 +37,8 @@
         "main": {
             "level": "DEBUG",
             "handlers": [
-                "file_handler_debug",
-                "file_handler_error",
+                "debug",
+                "error",
                 "console"
             ],
             "propagate": "no"
