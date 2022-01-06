@@ -15,7 +15,7 @@ if not os.path.exists("./logs"):
 # parsing command line arguments
 def collect_args():
     parser = utils.get_base_argparser(
-        "Collects information from command line.", "0.0.1"
+        "Collects information from command line.", "1.0.0"
     )
 
     # GitHub Args
@@ -61,7 +61,7 @@ def collect_args():
     # General
     parser.add_argument(
         "--debug",
-        help="Sets the debug level.",
+        help="Select the debug level.",
         default="DEBUG",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     )
