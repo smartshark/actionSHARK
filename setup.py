@@ -5,20 +5,26 @@ import sys
 from setuptools import setup, find_packages
 
 if not sys.version_info[0] == 3:
-    print('only python3 supported!')
+    print("only python3 supported!")
     sys.exit(1)
 
 setup(
-    name='actionSHARK',
-    version='0.0.1',
-    author='',
-    author_email='',
-    description='Collect data from GitHub actions (Workflows, runs, jobs, artifacts)',
-    install_requires=['mongoengine', 'pymongo', 'requests>=2.10.0', 'oauthlib>=3.0.0','pycoshark>=1.3.2'],
-    url='https://github.com/smartshark/actionSHARK',
-    download_url='https://github.com/smartshark/actionSHARK/archive/refs/heads/main.zip',
+    name="actionSHARK",
+    version="1.0.0",
+    author="Ahmad Hatahet",
+    author_email="ahmad.hatahet@hotmail.com",
+    description="Collect data from GitHub actions (workflows, runs, jobs, artifacts)",
+    install_requires=[
+        "mongoengine",
+        "pymongo",
+        "requests>=2.10.0",
+        "oauthlib>=3.0.0",
+        "pycoshark>=1.3.2",
+    ],
+    url="https://github.com/smartshark/actionSHARK",
+    download_url="https://github.com/smartshark/actionSHARK/archive/refs/heads/main.zip",
     packages=find_packages(),
-    test_suite='tests',
+    test_suite="tests",
     zip_safe=False,
     include_package_data=True,
     classifiers=[

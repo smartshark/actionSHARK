@@ -1,0 +1,123 @@
+{
+    "name": "actionSHARK",
+    "author": "Ahmad Hatahet",
+    "version": "1.0.0",
+    "plugin_type": "other",
+    "linux_libraries": [],
+    "created_collections": [
+        {
+            "name": "workflow"
+        },
+        {
+            "name": "run"
+        },
+        {
+            "name": "job"
+        },
+        {
+            "name": "artifact"
+        }
+    ],
+    "description": "Plugin to collect actions data for a github repository.",
+    "requires": [],
+    "arguments": [
+        {
+            "name": "plugin_path",
+            "required": true,
+            "position": 1,
+            "type": "install",
+            "description": "path to root folder of plugin"
+        },
+        {
+            "name": "db_database",
+            "required": true,
+            "position": 2,
+            "type": "execute",
+            "description": "name of the database in the mongodb"
+        },
+        {
+            "name": "db_user",
+            "required": false,
+            "position": 3,
+            "type": "execute",
+            "description": "database user for the mongodb"
+        },
+        {
+            "name": "db_password",
+            "required": false,
+            "position": 4,
+            "type": "execute",
+            "description": "password for the user of the mongodb"
+        },
+        {
+            "name": "db_hostname",
+            "required": false,
+            "position": 5,
+            "type": "execute",
+            "description": "hostname of the server, where the mongodb runs on"
+        },
+        {
+            "name": "db_port",
+            "required": false,
+            "position": 6,
+            "type": "execute",
+            "description": "port on which the mongodb is listening on"
+        },
+        {
+            "name": "db_authentication",
+            "required": false,
+            "position": 7,
+            "type": "execute",
+            "description": "databse against which users are authenticated"
+        },
+        {
+            "name": "ssl",
+            "required": false,
+            "position": 8,
+            "type": "execute",
+            "description": "needs to be set if database uses ssl connection"
+        },
+        {
+            "name": "token",
+            "required": false,
+            "position": 9,
+            "type": "execute",
+            "description": "GitHub token to authenticate user"
+        },
+        {
+            "name": "token_env",
+            "required": false,
+            "position": 10,
+            "type": "execute",
+            "description": "Environment variable, where token is stored"
+        },
+        {
+            "name": "owner",
+            "required": false,
+            "position": 11,
+            "type": "execute",
+            "description": "Owner name of the repository"
+        },
+        {
+            "name": "repository",
+            "required": false,
+            "position": 12,
+            "type": "execute",
+            "description": "Repository Name"
+        },
+        {
+            "name": "url",
+            "required": false,
+            "position": 13,
+            "type": "execute",
+            "description": "Repository URL"
+        },
+        {
+            "name": "debug",
+            "required": false,
+            "position": 14,
+            "type": "execute",
+            "description": "Select the debug level"
+        }
+    ]
+}
