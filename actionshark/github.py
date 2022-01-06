@@ -7,11 +7,6 @@ import requests
 import logging
 
 
-"""
-change limit to when its triggered parse next reset time from header
-remove sleep between requests
-"""
-
 # start logger
 logger = logging.getLogger("main.github")
 
