@@ -1,5 +1,6 @@
 import os
 import logging
+import logging.config
 import json
 import datetime as dt
 
@@ -36,7 +37,6 @@ class Config:
                 f"db_port: {self.db_port}",
                 f"db_authentication: {self.db_authentication}",
                 f"db_ssl: {self.db_ssl}",
-                f"verbose: {self.verbose}",
             ]
         )
 
@@ -72,14 +72,15 @@ def init_logger(level):
     with open("./logger_config.json", "r") as f:
         logging_cfg = json.load(f)
 
-    curr_time = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d_%H-%M-%S')
+    current_time = dt.datetime.strftime(dt.datetime.now(), "%Y-%m-%d_%H-%M-%S")
 
     # add date and time to log file name
-    logging_cfg["handlers"][
-        "debug"]["filename"] = logging_cfg["handlers"]["debug"]["filename"].replace(
-        ".log", f"_{curr_time}.log")
-    logging_cfg["handlers"]["error"]["filename"] = logging_cfg["handlers"]["error"]["filename"].replace(
-        ".log", f"{curr_time}.log")
+    logging_cfg["handlers"]["debug"]["filename"] = logging_cfg["handlers"]["debug"][
+        "filename"
+    ].replace(".log", f"_{current_time}.log")
+    logging_cfg["handlers"]["error"]["filename"] = logging_cfg["handlers"]["error"][
+        "filename"
+    ].replace(".log", f"{current_time}.log")
 
     logging_cfg["loggers"]["main"]["level"] = level
 
