@@ -22,7 +22,7 @@
                 },
                 {
                     "type": "StringType",
-                    "logical_type": "Other",
+                    "logical_type": "Location",
                     "field_name": "path",
                     "desc": "Local within the repository path of the workflow yaml file"
                 },
@@ -83,13 +83,13 @@
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "run_number",
                     "desc": "The order number of the run"
                 },
                 {
                     "type": "StringType",
-                    "logical_type": "Other",
+                    "logical_type": "Type",
                     "field_name": "event",
                     "desc": "The run event type"
                 },
@@ -114,13 +114,14 @@
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "workflow_github_id",
                     "desc": "The GitHub official id of the workflow"
                 },
                 {
                     "sub_type": "StructType",
                     "type": "ArrayType",
+                    "logical_type": "List",
                     "field_name": "pull_requests",
                     "desc": "List of documents for all pull requests of the run if any",
                     "fields": [
@@ -139,7 +140,7 @@
                         },
                         {
                             "type": "IntegerType",
-                            "logical_type": "Other",
+                            "logical_type": "Number",
                             "field_name": "number",
                             "desc": "The order number of the pull request"
                         },
@@ -150,14 +151,14 @@
                             "desc": "The head repository reference of the pull request"
                         },
                         {
-                            "type": "StringType",
-                            "logical_type": "Other",
+                            "type": "IntegerType",
+                            "logical_type": "Number",
                             "field_name": "head_id",
                             "desc": "The head repository id of the pull request"
                         },
                         {
                             "type": "StringType",
-                            "logical_type": "Other",
+                            "logical_type": "Name",
                             "field_name": "head_name",
                             "desc": "The head repository name of the pull request"
                         },
@@ -168,14 +169,14 @@
                             "desc": "The base repository reference of the pull request"
                         },
                         {
-                            "type": "StringType",
-                            "logical_type": "Other",
+                            "type": "IntegerType",
+                            "logical_type": "Number",
                             "field_name": "base_id",
                             "desc": "The base repository id of the pull request"
                         },
                         {
                             "type": "StringType",
-                            "logical_type": "Other",
+                            "logical_type": "Name",
                             "field_name": "base_name",
                             "desc": "The base repository name of the pull request"
                         }
@@ -195,7 +196,7 @@
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "run_attempt",
                     "desc": "The number of attempts to run"
                 },
@@ -208,12 +209,13 @@
                 {
                     "sub_type": "StructType",
                     "type": "ArrayType",
+                    "logical_type": "Nested",
                     "field_name": "head_repository",
                     "desc": "",
                     "fields": [
                         {
                             "type": "StringType",
-                            "logical_type": "Other",
+                            "logical_type": "Name",
                             "field_name": "full_name",
                             "desc": "The name of the owner/repository"
                         },
@@ -229,12 +231,13 @@
                 {
                     "sub_type": "StructType",
                     "type": "ArrayType",
+                    "logical_type": "Nested",
                     "field_name": "head_commit",
                     "desc": "",
                     "fields": [
                         {
                             "type": "StringType",
-                            "logical_type": "Other",
+                            "logical_type": "Text",
                             "field_name": "message",
                             "desc": "Commit Message"
                         },
@@ -260,13 +263,13 @@
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "job_id",
                     "desc": "The GitHub official id of the job"
                 },
                 {
                     "type": "StringType",
-                    "logical_type": "Other",
+                    "logical_type": "Name",
                     "field_name": "name",
                     "desc": "The name of the job"
                 },
@@ -279,7 +282,7 @@
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "run_attempt",
                     "desc": "Number of attempts to run"
                 },
@@ -310,12 +313,13 @@
                 {
                     "sub_type": "StructType",
                     "type": "ArrayType",
+                    "logical_type": "List",
                     "field_name": "steps",
                     "desc": "List of documents for all steps done for this job",
                     "fields": [
                         {
                             "type": "StringType",
-                            "logical_type": "Other",
+                            "logical_type": "Name",
                             "field_name": "name",
                             "desc": "Name of the step"
                         },
@@ -347,25 +351,25 @@
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "runner_id",
                     "desc": "The runner id"
                 },
                 {
                     "type": "StringType",
-                    "logical_type": "Other",
+                    "logical_type": "Name",
                     "field_name": "runner_name",
                     "desc": "The runner name"
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "runner_group_id",
                     "desc": "The runner group id"
                 },
                 {
                     "type": "StringType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "runner_group_name",
                     "desc": "The runner group name"
                 }
@@ -383,19 +387,19 @@
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "Number",
                     "field_name": "artifact_id",
                     "desc": "The GitHub official id of the artifact"
                 },
                 {
                     "type": "StringType",
-                    "logical_type": "Other",
+                    "logical_type": "Name",
                     "field_name": "name",
                     "desc": "The artifact name"
                 },
                 {
                     "type": "IntegerType",
-                    "logical_type": "Other",
+                    "logical_type": "ProductMetric",
                     "field_name": "size_in_bytes",
                     "desc": "The artifact size in bytes"
                 },
@@ -407,7 +411,7 @@
                 },
                 {
                     "type": "BoolType",
-                    "logical_type": "Other",
+                    "logical_type": "Boolean",
                     "field_name": "expired",
                     "desc": "If artifact expired"
                 },
