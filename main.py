@@ -82,14 +82,14 @@ def main():
 
     # initiate mongo instance
     mongo = Mongo(
+        cfg.db_database,
+        cfg.url,
         cfg.db_user,
         cfg.db_password,
         cfg.db_hostname,
         cfg.db_port,
-        cfg.db_database,
         cfg.db_authentication,
         cfg.db_ssl,
-        cfg.url,
     )
 
     # initiate GitHub instance
