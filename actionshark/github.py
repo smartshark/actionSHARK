@@ -38,7 +38,7 @@ class GitHub:
         token: Optional[str] = None,
         save_mongo: Callable = None,
     ) -> None:
-        """Initializing essential variables to use in the requests.
+        """Initializing essential variables.
 
         Args:
             owner (str): Owner of the repository. Defaults to None.
@@ -58,8 +58,8 @@ class GitHub:
         # add token to header
         self.__token = None
         if token:
-            self.__headers["Authorization"] = f"token {token}"
             self.__token = token
+            self.__headers["Authorization"] = f"token {token}"
 
         # MongoDB
         self.save_mongo = save_mongo
@@ -68,7 +68,6 @@ class GitHub:
         self.owner = owner
         self.repo = repo
         self.per_page = per_page
-        self.page = 1
 
     def authenticate_user(self):
         """
@@ -78,7 +77,8 @@ class GitHub:
 
         self.total_requests += 1
 
-        # if 401 = 'Unauthorized', but other response means the use is authorized
+        # if 401 = 'Unauthorized', but other responses mean the user is authorized
+        # Unauthorized users have much lower limit, 60 per hour
         if basic_auth.status_code == 401:
 
             logger.error(f"Error authenticated using token")
@@ -96,17 +96,12 @@ class GitHub:
         """Fetch all pages for an action and handel API limitation.
 
         Args:
-            github_url (str): GitHub API url to loop over and collect responses. Defaults to None.
+            github_url (str): GitHub API url to loop over and collect responses.
             checker (str, optional): The key to the element, who has all items. Defaults to None.
         """
 
-        # case 1: limit achieved and action was not fully fetched -> stopped while paginating
-        # case 2: got response but was last action page and last remaining the same time
-        # case 3: still remaining and last page was achieved -> jump to next action
-        # case 4: limit was not reached and an hour passed -> reset limit variables
-
         while True:
-            # append page number to url
+            # append page number to the url
             github_url += f"&page={self.page}"
 
             # get response
@@ -121,8 +116,7 @@ class GitHub:
                 logger.error(response)
                 sys.exit(1)
 
-            # handel case: limit achieved and action was not fully fetched -> stopped while paginating
-            # handel case: got response but was last action page and last remaining the same time
+            # handle limit
             if response.status_code == 403:
 
                 headers_dict = response.headers
@@ -149,40 +143,44 @@ class GitHub:
                 logger.debug(
                     f"Continue with fetching {self.current_action} from last GET request"
                 )
+
+                # after sleeping restart last loop to continue from last action
                 continue
 
-            # check if key is not empty
+            # get the items from a sub key
             response_JSON = response.json()
             if checker:
                 response_JSON = response_JSON.get(checker)
 
-            # count number of documents
+            # count number of items
             response_count = len(response_JSON)
 
-            # handel case: limit was not reached and an hour passed -> reset limit variables
+            # if no items, jump to next action
             if not response_JSON:
                 break
 
-            # save documents to mongodb
+            # save items to mongodb
             self.save_mongo(response_JSON, self.current_action)
 
             # handel page incrementing
             github_url = github_url[: -len(f"&page={self.page}")]
             self.page += 1
 
-            # updating variables to deal with limits
+            # updating metric variables
             self.total_requests += 1
 
-            # break after saving if response_count is less than per_page
+            # break after saving if number of items is less than per_page
             if response_count < self.per_page:
                 break
 
     def get_workflows(self) -> None:
         """Fetching workflows data from GitHub API for specific repository and owner."""
 
+        # set what action to run and starting page
         self.current_action = "workflow"
         self.page = 1
 
+        # constructing the GET url
         url = self.actions_url["workflow"].format(
             owner=self.owner, repo=self.repo, per_page=self.per_page
         )
@@ -197,9 +195,11 @@ class GitHub:
     def get_runs(self) -> None:
         """Fetching workflow runs data from GitHub API for specific repository and owner."""
 
+        # set what action to run and starting page
         self.current_action = "run"
         self.page = 1
 
+        # constructing the GET url
         url = self.actions_url["run"].format(
             owner=self.owner, repo=self.repo, per_page=self.per_page
         )
@@ -225,9 +225,11 @@ class GitHub:
             )
             sys.exit(1)
 
+        # set what action to run and starting page
         self.current_action = "job"
         self.page = 1
 
+        # constructing the GET url
         url = self.actions_url["job"].format(
             owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page
         )
@@ -238,9 +240,11 @@ class GitHub:
     def get_artifacts(self) -> None:
         """Fetching run artifacts data from GitHub API for specific repository, owner, and run."""
 
+        # set what action to run and starting page
         self.current_action = "artifact"
         self.page = 1
 
+        # constructing the GET url
         url = self.actions_url["artifact"].format(
             owner=self.owner, repo=self.repo, per_page=self.per_page
         )
@@ -251,6 +255,14 @@ class GitHub:
         self.paginating(github_url, "artifacts")
 
         logger.debug(f"Finish fetching artifacts")
+
+    def __finishing_message(self):
+        """
+        Some log messages to append after finishing run()
+        """
+        logger.debug(f"Number of requests: {self.total_requests}")
+        logger.debug(f"Number of stopping: {self.limit_handler_counter}")
+        logger.debug("Finished fetching actions.")
 
     def run(self, runs_object=None) -> None:
         """Collect all action for a repository.
@@ -267,18 +279,26 @@ class GitHub:
         if not self.__token:
             logger.debug(f"Proceding without token")
 
+        # fetching actions
         self.get_workflows()
         self.get_artifacts()
         self.get_runs()
 
         # if Runs object was passed, for each Run get
-        if runs_object:
-            # collect ids in a list to avoid cursor timeout
-            logger.debug("Collecting run ids")
-            run_ids = [run.run_id for run in runs_object.objects()]
+        if not runs_object:
+            logger.error("Run object is not passed")
+            logger.error("Run object is needed to get Jobs")
+            self.__finishing_message()
+            sys.exit(1)
 
-            # logger is used here to not log each time the function excutes
-            logger.debug(f"Start fetching jobs")
-            for run in run_ids:
-                self.get_jobs(run)
-            logger.debug(f"Finish fetching jobs")
+        # collect ids in a list to avoid cursor timeout
+        logger.debug("Collecting run ids")
+        run_ids = [run.run_id for run in runs_object.objects()]
+
+        # logger is used here to not log each time the function excutes
+        logger.debug(f"Start fetching jobs")
+        for run in run_ids:
+            self.get_jobs(run)
+        logger.debug(f"Finish fetching jobs")
+
+        self.__finishing_message()

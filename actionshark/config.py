@@ -3,14 +3,14 @@ import logging
 import logging.config
 import json
 import datetime as dt
+from typing import Optional
 
 
 class Config:
     def __init__(self, args):
 
         self.token = args.token
-        self.url = args.url
-        self.parse_url(args.owner, args.repository, self.url)
+        self.parse_url(args.owner, args.repository, args.url)
         self.db_database = args.db_database
         self.db_user = args.db_user
         self.db_password = args.db_password
@@ -30,6 +30,7 @@ class Config:
                 f"token: {self.token}",
                 f"owner: {self.owner}",
                 f"repo: {self.repo}",
+                f"url: {self.url}",
                 f"db_database: {self.db_database}",
                 f"db_user: {self.db_user}",
                 f"db_password: {self.db_password}",
@@ -37,10 +38,16 @@ class Config:
                 f"db_port: {self.db_port}",
                 f"db_authentication: {self.db_authentication}",
                 f"db_ssl: {self.db_ssl}",
+                f"logger_level: {self.logger_level}",
             ]
         )
 
-    def parse_url(self, owner=None, repo=None, url=None) -> None:
+    def parse_url(
+        self,
+        owner: Optional[str] = None,
+        repo: Optional[str] = None,
+        url: Optional[str] = None,
+    ) -> None:
 
         self.owner = owner
         self.repo = repo
@@ -53,8 +60,7 @@ class Config:
             self.owner = url_parts[3]
             self.repo = url_parts[4]
 
-        else:
-            self.url = f"https://github.com/{owner}/{repo}.git"
+        self.url = f"https://github.com/{self.owner}/{self.repo}.git"
 
     def get_logger_level(self, level: str = "DEBUG"):
 
@@ -67,6 +73,7 @@ class Config:
         return level
 
 
+# modifying logger configuration
 def init_logger(level):
     # load logger configuration
     with open("./logger_config.json", "r") as f:
