@@ -203,7 +203,6 @@ class GitHub:
         url = self.actions_url["run"].format(
             owner=self.owner, repo=self.repo, per_page=self.per_page
         )
-        url += f"&exclude_pull_requests=False"
         github_url = self.api_url + url
 
         logger.debug(f"Start fetching runs")
