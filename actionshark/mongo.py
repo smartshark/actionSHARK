@@ -1,10 +1,9 @@
 import datetime as dt
 from typing import Optional, Any, Tuple
 import logging
-from mongoengine.fields import EmbeddedDocumentField
 
 from pycoshark.utils import create_mongodb_uri_string
-from pycoshark.mongomodels import VCSSystem
+from pycoshark.mongomodels import VCSSystem, Commit
 
 from mongoengine import connect
 from mongoengine import (
@@ -63,6 +62,7 @@ class Run(Document):
     run_attempt = IntField()
     run_started_at = DateTimeField(default=None)
 
+    triggering_commit_id = ObjectIdField()
     triggering_repository_url = StringField(default=None)
     triggering_commit_sha = StringField()
     triggering_commit_branch = StringField()
@@ -295,14 +295,17 @@ class Mongo:
         run.run_attempt = self.__to_int(obj.get("run_attempt"))
         run.run_started_at = self.__parse_date(obj.get("run_started_at"))
 
-        run.triggering_commit_sha = obj.get("head_sha")
-        run.triggering_commit_branch = obj.get("head_branch")
-        run.triggering_commit_message = obj["head_commit"].get("message")
-        run.triggering_commit_timestamp = obj["head_commit"].get("timestamp")
-        if obj.get("head_repository"):
-            run.triggering_repository_url = self.__run_head_repository_url(
-                obj["head_repository"].get("full_name")
-            )
+        # if commit was not found in commit collection, save commit data
+        run.triggering_commit_id = self.__commit_object_id(obj.get("head_sha"))
+        if not run.triggering_commit_id:
+            run.triggering_commit_sha = obj.get("head_sha")
+            run.triggering_commit_branch = obj.get("head_branch")
+            run.triggering_commit_message = obj["head_commit"].get("message")
+            run.triggering_commit_timestamp = obj["head_commit"].get("timestamp")
+            if obj.get("head_repository"):
+                run.triggering_repository_url = self.__run_head_repository_url(
+                    obj["head_repository"].get("full_name")
+                )
 
         return run
 
@@ -490,6 +493,30 @@ class Mongo:
             r = None
         return r
 
+    def __commit_object_id(
+        self, value: Optional[str] = None
+    ) -> Optional[ObjectIdField]:
+        """
+        Find Run object_id from Run collection.
+
+        Args:
+            value (int, optional): Run id. Defaults to None.
+
+        Returns:
+            Optional[ObjectIdField]
+        """
+
+        if not value:
+            return None
+
+        try:
+            r = Commit.objects.get(revision_hash=value).id
+        except Commit.DoesNotExist:
+            # disable logging just for now, because all commits are not in commit collection
+            # logger.error(f"Commit not found revision_hash:{value}")
+            r = None
+        return r
+
     # ~ helper functions
 
     def __parse_date(
@@ -546,6 +573,7 @@ class Mongo:
             return None
 
         value = value.replace("api.", "")
+        value = value.replace("repos/", "")
         value = value.replace(".git", "")
         value = value + ".git"
 
