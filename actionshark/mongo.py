@@ -62,7 +62,7 @@ class Run(Document):
     run_attempt = IntField()
     run_started_at = DateTimeField(default=None)
 
-    triggering_commit_id = ObjectIdField()
+    triggering_commit_id = ObjectIdField(default=None)
     triggering_repository_url = StringField(default=None)
     triggering_commit_sha = StringField()
     triggering_commit_branch = StringField()
@@ -297,15 +297,14 @@ class Mongo:
 
         # if commit was not found in commit collection, save commit data
         run.triggering_commit_id = self.__commit_object_id(obj.get("head_sha"))
-        if not run.triggering_commit_id:
-            run.triggering_commit_sha = obj.get("head_sha")
-            run.triggering_commit_branch = obj.get("head_branch")
-            run.triggering_commit_message = obj["head_commit"].get("message")
-            run.triggering_commit_timestamp = obj["head_commit"].get("timestamp")
-            if obj.get("head_repository"):
-                run.triggering_repository_url = self.__run_head_repository_url(
-                    obj["head_repository"].get("full_name")
-                )
+        run.triggering_commit_sha = obj.get("head_sha")
+        run.triggering_commit_branch = obj.get("head_branch")
+        run.triggering_commit_message = obj["head_commit"].get("message")
+        run.triggering_commit_timestamp = obj["head_commit"].get("timestamp")
+        if obj.get("head_repository"):
+            run.triggering_repository_url = self.__run_head_repository_url(
+                obj["head_repository"].get("full_name")
+            )
 
         return run
 
