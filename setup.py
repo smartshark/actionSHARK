@@ -18,7 +18,6 @@ setup(
         "mongoengine",
         "pymongo",
         "requests>=2.10.0",
-        "oauthlib>=3.0.0",
         "pycoshark>=1.3.2",
     ],
     url="https://github.com/smartshark/actionSHARK",
