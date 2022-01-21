@@ -24,7 +24,7 @@
                     "type": "StringType",
                     "logical_type": "Location",
                     "field_name": "path",
-                    "desc": "Local within the repository path of the workflow yaml file"
+                    "desc": "RRelative path of the workflow yaml file"
                 },
                 {
                     "type": "StringType",
@@ -56,16 +56,10 @@
                     "logical_type": "RID",
                     "reference_to": "vcs_system",
                     "field_name": "vcs_system_id",
-                    "desc": "ObjectID of the project to which this workflow belongs"
-                },
-                {
-                    "type": "StringType",
-                    "logical_type": "URL",
-                    "field_name": "project_url",
-                    "desc": "URL of the project to which this workflow belongs"
+                    "desc": "ObjectID of the vcs_system to which this workflow belongs"
                 }
             ],
-            "desc": "All workflows for a repository",
+            "desc": "All workflows of a repository",
             "collection_name": "workflow"
         },
         {
@@ -137,13 +131,13 @@
                             "type": "IntegerType",
                             "logical_type": "Other",
                             "field_name": "pull_request_number",
-                            "desc": "The number of the pull request"
+                            "desc": "The number of the pull request belongs to the source repository"
                         },
                         {
                             "type": "IntegerType",
                             "logical_type": "Other",
                             "field_name": "target_id",
-                            "desc": "The id of the target repository"
+                            "desc": "The GitHub id of the pull request of the target repository"
                         },
                         {
                             "type": "StringType",
@@ -167,7 +161,7 @@
                             "type": "IntegerType",
                             "logical_type": "Other",
                             "field_name": "source_id",
-                            "desc": "The id of the source repository"
+                            "desc": "The GitHub id of the pull request of the source repository"
                         },
                         {
                             "type": "StringType",
@@ -278,7 +272,7 @@
                     "type": "IntegerType",
                     "logical_type": "Other",
                     "field_name": "run_attempt",
-                    "desc": "Number of attempts to run"
+                    "desc": "Number of attempts to execute"
                 },
                 {
                     "type": "StringType",
@@ -321,7 +315,7 @@
                             "type": "StringType",
                             "logical_type": "Other",
                             "field_name": "status",
-                            "desc": "Status of the step"
+                            "desc": "Status of the sequence step"
                         },
                         {
                             "type": "StringType",
