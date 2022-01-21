@@ -1,7 +1,11 @@
 #!/bin/sh
 PLUGIN_PATH=${1}
 
-COMMAND="python ${1}/main.py --db-database ${2} --token ${9}"
+COMMAND="python ${1}/main.py --token ${9} --url ${13}"
+
+if [ ! -z ${2} ] && [ ${2} != "None" ]; then
+	COMMAND="$COMMAND --db-database ${2}"
+fi
 
 if [ ! -z ${3} ] && [ ${3} != "None" ]; then
 	COMMAND="$COMMAND --db-user ${3}"
@@ -37,10 +41,6 @@ fi
 
 if [ ! -z ${12} ] && [ ${12} != "None" ]; then
 	COMMAND="$COMMAND --repository ${12}"
-fi
-
-if [ ! -z ${13} ] && [ ${13} != "None" ]; then
-	COMMAND="$COMMAND --url ${13}"
 fi
 
 if [ ! -z ${14} ] && [ ${14} != "None" ]; then
