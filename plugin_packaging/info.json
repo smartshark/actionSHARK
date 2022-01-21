@@ -30,7 +30,7 @@
         },
         {
             "name": "db_database",
-            "required": true,
+            "required": false,
             "position": 2,
             "type": "execute",
             "description": "name of the database in the mongodb"
@@ -68,7 +68,7 @@
             "required": false,
             "position": 7,
             "type": "execute",
-            "description": "databse against which users are authenticated"
+            "description": "database against which users are authenticated"
         },
         {
             "name": "ssl",
@@ -79,7 +79,7 @@
         },
         {
             "name": "token",
-            "required": false,
+            "required": true,
             "position": 9,
             "type": "execute",
             "description": "GitHub token to authenticate user"
@@ -107,7 +107,7 @@
         },
         {
             "name": "url",
-            "required": false,
+            "required": true,
             "position": 13,
             "type": "execute",
             "description": "Repository URL"
