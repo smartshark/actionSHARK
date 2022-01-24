@@ -15,8 +15,8 @@ setup(
     author_email="ahmad.hatahet@hotmail.com",
     description="Collect data from GitHub actions (workflows, runs, jobs, artifacts)",
     install_requires=[
-        "mongoengine",
-        "pymongo",
+        "mongoengine==0.23.1",
+        "pymongo==3.12.2",
         "requests>=2.10.0",
         "pycoshark>=1.3.2",
     ],
