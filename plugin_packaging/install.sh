@@ -3,4 +3,4 @@ PLUGIN_PATH=$1
 cd $PLUGIN_PATH
 
 # Install actionSHARK
-python3.5 $PLUGIN_PATH/setup.py install --user
+python $PLUGIN_PATH/setup.py install --user
