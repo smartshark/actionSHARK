@@ -1,45 +1,68 @@
 # actionSHARK
-### __Description__:
+
+### **Description**:
+
 actionSHARK is developed to collect all actions from a GitHub repository using command line and save them to MongoDB.<br />
 Actions in GitHub are divided to workflows, runs, jobs, and artifacts.
 For more information about actions, please read the GitHub documentation [here](https://docs.github.com/en/actions).
 <br />
 <br />
-### __Installation__:
+
+### **Installation**:
+
 Clone the repository
+
 ```
 git clone https://github.com/smartshark/actionSHARK.git
 ```
+
 Then change directory to "actionSHARK":
+
 ```
 cd actionSHARK
 ```
+
 <br />
 
-### __How to Run__:
+### **Create environment and install requirements**:
+
+```
+python -m venv .env
+source ./.env/Scripts/activate
+pip install -r requirements.txt
+```
+
+<br />
+
+### **How to Run**:
+
 Simple quick run for a local MongoDB:
 <br />
+
 ```
 python main.py -ru [repository url]
 ```
+
 OR
+
 ```
 python main.py -o [owner] -r [repository]
 ```
-<br />
+
+To specify a database, username, and password :
 <br />
 
-Specify a database, username, and password :
-<br />
 ```
 python main.py -t [token] -ru [repository url] -U [username] -P [password] -DB [database]
 ```
+
 <br />
 
-### __Command line arguments__:
+### **Command line arguments**:
 
 You could run the following command:
 <br />
+
 ```
 python main.py -h
 ```
@@ -64,6 +87,6 @@ python main.py -h
 <br />
 1: ActionShark will run without a token but the limit is much lower than with a token.
 <br />
-2: For a local MongoDB, username and password are optional.
+2: If you are running local MongoDB with the default settings, username and password are optional.
 
-***
+---
