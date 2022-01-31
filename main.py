@@ -3,9 +3,9 @@ import logging
 import logging.config
 
 import pycoshark.utils as utils
-from actionshark.config import Config, init_logger
-from actionshark.mongo import Mongo
-from actionshark.github import GitHub
+from actionSHARK.config import Config, init_logger
+from actionSHARK.mongo import Mongo
+from actionSHARK.github import GitHub
 
 # create logs folder
 if not os.path.exists("./logs"):
