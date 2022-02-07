@@ -1,5 +1,6 @@
+import sys
 import datetime as dt
-from typing import Optional, Any, Tuple
+from typing import Optional, Any, Tuple, List
 import logging
 
 from pycoshark.utils import create_mongodb_uri_string
@@ -209,18 +210,19 @@ class Mongo:
 
             try:
                 func(document).save()
-            except:
+            except Exception as e:
                 logger.error(
                     f'Failed saving document action:{action}, id:{document["id"]}'
                 )
+                logger.exception(e)
                 # continue to avoid system crash if saving document is failed
                 continue
 
     def __create_list_embedded_docs(
         self,
         sub_operation: Optional[str] = None,
-        sub_documents: Optional[list[dict]] = None,
-    ) -> Optional[list[Any]]:
+        sub_documents: Optional[List[dict]] = None,
+    ) -> Optional[List[Any]]:
 
         if not sub_operation or not sub_documents:
             return []
@@ -532,11 +534,14 @@ class Mongo:
         """
         if not value:
             return None
-
+        
+        date_fmt = '%Y-%m-%dT%H:%M:%S%z'
         if is_millisecond:
-            return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f%z")
-        else:
-            return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S%z")
+            date_fmt = '%Y-%m-%dT%H:%M:%S.%f%z'
+
+        if sys.version_info.minor < 8:
+            date_fmt = date_fmt.replace('%z', 'Z')
+        return dt.datetime.strptime(value, date_fmt)
 
     def __to_int(self, value: Optional[str] = None) -> Optional[int]:
         """

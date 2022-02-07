@@ -76,7 +76,7 @@ class Config:
 # modifying logger configuration
 def init_logger(level):
     # load logger configuration
-    with open("./logger_config.json", "r") as f:
+    with open("{}/../logger_config.json".format(os.path.dirname(os.path.abspath(__file__))), "r") as f:
         logging_cfg = json.load(f)
 
     current_time = dt.datetime.strftime(dt.datetime.now(), "%Y-%m-%d_%H-%M-%S")
