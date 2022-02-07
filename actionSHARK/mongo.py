@@ -84,6 +84,7 @@ class Job(Document):
     job_id = IntField()
     name = StringField()
     run_id = ObjectIdField()
+    head_sha = StringField()
     run_attempt = IntField()
     status = StringField()
     conclusion = StringField()
@@ -106,6 +107,8 @@ class Artifact(Document):
     created_at = DateTimeField()
     updated_at = DateTimeField()
     expires_at = DateTimeField()
+    project_id = ObjectIdField(default=None)
+    vcs_system_id = ObjectIdField(default=None)
 
 
 class Mongo:
@@ -253,17 +256,23 @@ class Mongo:
         Returns:
             Workflows: A MongoDB object ready to save.
         """
+        # delete old doecument if any
+        # keep recent data instead of old ones
+        workflow_id = self.__to_int(obj.get("id"))
+        vcs_system_id, project_id = self.__project_object_id(self.project_url)
+
+        keyargs = {"workflow_id": workflow_id, "vcs_system_id": vcs_system_id}
+        Workflow.objects(**keyargs).delete()
+
         workflow = Workflow()
 
-        workflow.workflow_id = self.__to_int(obj.get("id"))
+        workflow.workflow_id = workflow_id
         workflow.name = obj.get("name")
         workflow.path = obj.get("path")
         workflow.state = obj.get("state")
         workflow.created_at = self.__parse_date(obj.get("created_at"), True)
         workflow.updated_at = self.__parse_date(obj.get("updated_at"), True)
-        workflow.vcs_system_id, workflow.project_id = self.__project_object_id(
-            self.project_url
-        )
+        workflow.vcs_system_id, workflow.project_id = vcs_system_id, project_id
 
         if not workflow.project_id:
             workflow.project_url = self.project_url
@@ -279,6 +288,14 @@ class Mongo:
         Returns:
             Runs: A MongoDB object ready to save.
         """
+        # delete old doecument if any
+        # keep recent data instead of old ones
+        run_id = self.__to_int(obj.get("id"))
+        triggering_commit_sha = obj.get("head_sha")
+
+        keyargs = {"run_id": run_id, "triggering_commit_sha": triggering_commit_sha}
+        Run.objects(**keyargs).delete()
+
         run = Run()
 
         run.run_id = self.__to_int(obj.get("id"))
@@ -299,7 +316,7 @@ class Mongo:
 
         # if commit was not found in commit collection, save commit data
         run.triggering_commit_id = self.__commit_object_id(obj.get("head_sha"))
-        run.triggering_commit_sha = obj.get("head_sha")
+        run.triggering_commit_sha = triggering_commit_sha
         run.triggering_commit_branch = obj.get("head_branch")
         run.triggering_commit_message = obj["head_commit"].get("message")
         run.triggering_commit_timestamp = obj["head_commit"].get("timestamp")
@@ -349,11 +366,21 @@ class Mongo:
         Returns:
             Jobs: A MongoDB object ready to save.
         """
+        # delete old doecument if any
+        # keep recent data instead of old ones
+        job_id = self.__to_int(obj.get("id"))
+        head_sha = obj.get("head_sha")
+        runner_id = self.__to_int(obj.get("runner_id"))
+
+        keyargs = {"job_id": job_id, "head_sha": head_sha, "runner_id": runner_id}
+        Job.objects(**keyargs).delete()
+
         job = Job()
 
         job.job_id = self.__to_int(obj.get("id"))
         job.name = obj.get("name")
         job.run_id = self.__run_object_id(self.__to_int(obj.get("run_id")))
+        job.head_sha = head_sha
         job.run_attempt = self.__to_int(obj.get("run_attempt"))
         job.status = obj.get("status")
         job.conclusion = obj.get("conclusion")
@@ -361,7 +388,7 @@ class Mongo:
         job.completed_at = self.__parse_date(obj.get("completed_at"))
         job.steps = self.__create_list_embedded_docs("job_step", obj.get("steps"))
 
-        job.runner_id = self.__to_int(obj.get("runner_id"))
+        job.runner_id = runner_id
         job.runner_name = obj.get("runner_name")
         job.runner_group_id = (
             self.__to_int(obj.get("runner_group_id"))
@@ -401,6 +428,14 @@ class Mongo:
         Returns:
             Artifacts: A MongoDB object ready to save.
         """
+        # delete old doecument if any
+        # keep recent data instead of old ones
+        artifact_id = self.__to_int(obj.get("id"))
+        vcs_system_id, project_id = self.__project_object_id(self.project_url)
+
+        keyargs = {"artifact_id": artifact_id, "vcs_system_id": vcs_system_id}
+        Artifact.objects(**keyargs).delete()
+
         artifact = Artifact()
 
         artifact.artifact_id = self.__to_int(obj.get("id"))
@@ -411,6 +446,10 @@ class Mongo:
         artifact.created_at = self.__parse_date(obj.get("created_at"))
         artifact.updated_at = self.__parse_date(obj.get("updated_at"))
         artifact.expires_at = self.__parse_date(obj.get("expires_at"))
+        artifact.vcs_system_id, artifact.project_id = vcs_system_id, project_id
+
+        if not artifact.project_id:
+            artifact.project_url = self.project_url
 
         return artifact
 
@@ -513,7 +552,7 @@ class Mongo:
         try:
             r = Commit.objects.get(revision_hash=value).id
         except Commit.DoesNotExist:
-            # disable logging just for now, because all commits are not in commit collection
+            # disable logging just for now, because most of the commits are not in commit collection
             # logger.error(f"Commit not found revision_hash:{value}")
             r = None
         return r
@@ -534,13 +573,13 @@ class Mongo:
         """
         if not value:
             return None
-        
-        date_fmt = '%Y-%m-%dT%H:%M:%S%z'
+
+        date_fmt = "%Y-%m-%dT%H:%M:%S%z"
         if is_millisecond:
-            date_fmt = '%Y-%m-%dT%H:%M:%S.%f%z'
+            date_fmt = "%Y-%m-%dT%H:%M:%S.%f%z"
 
         if sys.version_info.minor < 8:
-            date_fmt = date_fmt.replace('%z', 'Z')
+            date_fmt = date_fmt.replace("%z", "Z")
         return dt.datetime.strptime(value, date_fmt)
 
     def __to_int(self, value: Optional[str] = None) -> Optional[int]:
