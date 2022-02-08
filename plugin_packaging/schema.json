@@ -269,6 +269,12 @@
                     "desc": "ObjectID of the run to which this job belongs"
                 },
                 {
+                    "type": "StringType",
+                    "logical_type": "Text",
+                    "field_name": "head_sha",
+                    "desc": "The triggering commit sha reference"
+                },
+                {
                     "type": "IntegerType",
                     "logical_type": "Other",
                     "field_name": "run_attempt",
@@ -426,6 +432,20 @@
                     "logical_type": "Date",
                     "field_name": "expires_at",
                     "desc": "Date on which this artifact will expire"
+                },
+                {
+                    "type": "ObjectIdType",
+                    "logical_type": "RID",
+                    "reference_to": "vcs_system",
+                    "field_name": "project_id",
+                    "desc": "ObjectID of the project to which this artifact belongs"
+                },
+                {
+                    "type": "ObjectIdType",
+                    "logical_type": "RID",
+                    "reference_to": "vcs_system",
+                    "field_name": "vcs_system_id",
+                    "desc": "ObjectID of the vcs_system to which this artifact belongs"
                 }
             ],
             "desc": "All artifact for a repository",
