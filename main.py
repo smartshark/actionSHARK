@@ -94,7 +94,10 @@ def main():
 
     # initiate GitHub instance
     github = GitHub(
-        owner=cfg.owner, repo=cfg.repo, token=cfg.token, save_mongo=mongo.save_documents
+        owner=cfg.owner,
+        repo=cfg.repo,
+        token=cfg.token,
+        save_mongo=mongo.upsert_documents,
     )
 
     # get all actions

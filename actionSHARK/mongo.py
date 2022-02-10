@@ -125,10 +125,10 @@ class Mongo:
     ) -> None:
 
         self.__operations = {
-            "workflow": self.__create_workflow,
-            "run": self.__create_run,
-            "job": self.__create_job,
-            "artifact": self.__create_artifact,
+            "workflow": self.__upsert_workflow,
+            "run": self.__upsert_run,
+            "job": self.__upsert_job,
+            "artifact": self.__upsert_artifact,
         }
 
         self.db_database = db_database
@@ -185,7 +185,7 @@ class Mongo:
 
         return True
 
-    def save_documents(
+    def upsert_documents(
         self, documents: Optional[dict] = None, action: Optional[str] = None
     ) -> None:
         """Loop over Elements, to map and save. This function should be passed to GitHub instance as "save_mongo=save_documents".
@@ -212,7 +212,7 @@ class Mongo:
         for document in documents:
 
             try:
-                func(document).save()
+                func(document)
             except Exception as e:
                 logger.error(
                     f'Failed saving document action:{action}, id:{document["id"]}'
@@ -247,7 +247,7 @@ class Mongo:
 
     # ~ create documents
 
-    def __create_workflow(self, obj: dict) -> Workflow:
+    def __upsert_workflow(self, obj: dict) -> None:
         """Map object to the appropriate files of Workflows.
 
         Args:
@@ -256,30 +256,27 @@ class Mongo:
         Returns:
             Workflows: A MongoDB object ready to save.
         """
-        # delete old doecument if any
-        # keep recent data instead of old ones
-        workflow_id = self.__to_int(obj.get("id"))
-        vcs_system_id, project_id = self.__project_object_id(self.project_url)
 
-        keyargs = {"workflow_id": workflow_id, "vcs_system_id": vcs_system_id}
-        Workflow.objects(**keyargs).delete()
+        temp_dict = {
+            "workflow_id": self.__to_int(obj.get("id")),
+            "name": obj.get("name"),
+            "path": obj.get("path"),
+            "state": obj.get("state"),
+            "created_at": self.__parse_date(obj.get("created_at"), True),
+            "updated_at": self.__parse_date(obj.get("updated_at"), True),
+        }
 
-        workflow = Workflow()
+        temp_dict["vcs_system_id"], temp_dict["project_id"] = self.__project_object_id(
+            self.project_url
+        )
 
-        workflow.workflow_id = workflow_id
-        workflow.name = obj.get("name")
-        workflow.path = obj.get("path")
-        workflow.state = obj.get("state")
-        workflow.created_at = self.__parse_date(obj.get("created_at"), True)
-        workflow.updated_at = self.__parse_date(obj.get("updated_at"), True)
-        workflow.vcs_system_id, workflow.project_id = vcs_system_id, project_id
+        # if project not yet in vcs_system add the repository url
+        if not temp_dict["project_id"]:
+            temp_dict["project_url"] = self.project_url
 
-        if not workflow.project_id:
-            workflow.project_url = self.project_url
+        Workflow.objects(**temp_dict).upsert_one(**temp_dict)
 
-        return workflow
-
-    def __create_run(self, obj: dict) -> Run:
+    def __upsert_run(self, obj: dict) -> None:
         """Map object to the appropriate files of Runs.
 
         Args:
@@ -288,44 +285,42 @@ class Mongo:
         Returns:
             Runs: A MongoDB object ready to save.
         """
-        # delete old doecument if any
-        # keep recent data instead of old ones
-        run_id = self.__to_int(obj.get("id"))
-        triggering_commit_sha = obj.get("head_sha")
 
-        keyargs = {"run_id": run_id, "triggering_commit_sha": triggering_commit_sha}
-        Run.objects(**keyargs).delete()
+        temp_dict = {
+            "run_id": self.__to_int(obj.get("id")),
+            "run_number": self.__to_int(obj.get("run_number")),
+            "event": obj.get("event"),
+            "status": obj.get("status"),
+            "conclusion": obj.get("conclusion"),
+            "workflow_id": self.__workflow_object_id(
+                v_workflow_id=self.__to_int(obj.get("workflow_id")),
+                v_name=obj.get("name"),
+            ),
+            "pull_requests": self.__create_list_embedded_docs(
+                "run_pull_request", obj.get("pull_requests")
+            ),
+            "created_at": self.__parse_date(obj.get("created_at")),
+            "updated_at": self.__parse_date(obj.get("updated_at")),
+            "run_attempt": self.__to_int(obj.get("run_attempt")),
+            "run_started_at": self.__parse_date(obj.get("run_started_at")),
+            "triggering_commit_sha": obj.get("head_sha"),
+            "triggering_commit_branch": obj.get("head_branch"),
+            "triggering_commit_message": obj["head_commit"].get("message"),
+            "triggering_commit_timestamp": obj["head_commit"].get("timestamp"),
+        }
 
-        run = Run()
-
-        run.run_id = self.__to_int(obj.get("id"))
-        run.run_number = self.__to_int(obj.get("run_number"))
-        run.event = obj.get("event")
-        run.status = obj.get("status")
-        run.conclusion = obj.get("conclusion")
-        run.workflow_id = self.__workflow_object_id(
-            v_workflow_id=self.__to_int(obj.get("workflow_id")), v_name=obj.get("name")
-        )
-        run.pull_requests = self.__create_list_embedded_docs(
-            "run_pull_request", obj.get("pull_requests")
-        )
-        run.created_at = self.__parse_date(obj.get("created_at"))
-        run.updated_at = self.__parse_date(obj.get("updated_at"))
-        run.run_attempt = self.__to_int(obj.get("run_attempt"))
-        run.run_started_at = self.__parse_date(obj.get("run_started_at"))
-
-        # if commit was not found in commit collection, save commit data
-        run.triggering_commit_id = self.__commit_object_id(obj.get("head_sha"))
-        run.triggering_commit_sha = triggering_commit_sha
-        run.triggering_commit_branch = obj.get("head_branch")
-        run.triggering_commit_message = obj["head_commit"].get("message")
-        run.triggering_commit_timestamp = obj["head_commit"].get("timestamp")
+        # add triggering repository url if available
         if obj.get("head_repository"):
-            run.triggering_repository_url = self.__run_head_repository_url(
+            temp_dict["triggering_repository_url"] = self.__run_head_repository_url(
                 obj["head_repository"].get("full_name")
             )
 
-        return run
+        # if commit object_id is None avoid adding to temp_dict
+        triggering_commit_id = self.__commit_object_id(obj.get("head_sha"))
+        if triggering_commit_id:
+            temp_dict["triggering_commit_id"] = triggering_commit_id
+
+        Run.objects(**temp_dict).upsert_one(**temp_dict)
 
     def __create_run_pull_request(self, obj: dict) -> RunPullRequest:
         """Map object to the appropriate files of RunPullRequests.
@@ -357,7 +352,7 @@ class Mongo:
 
         return run_pull
 
-    def __create_job(self, obj: dict) -> Job:
+    def __upsert_job(self, obj: dict) -> None:
         """Map object to the appropriate files of Jobs.
 
         Args:
@@ -366,38 +361,24 @@ class Mongo:
         Returns:
             Jobs: A MongoDB object ready to save.
         """
-        # delete old doecument if any
-        # keep recent data instead of old ones
-        job_id = self.__to_int(obj.get("id"))
-        head_sha = obj.get("head_sha")
-        runner_id = self.__to_int(obj.get("runner_id"))
+        temp_dict = {
+            "job_id": self.__to_int(obj.get("id")),
+            "name": obj.get("name"),
+            "run_id": self.__run_object_id(self.__to_int(obj.get("run_id"))),
+            "head_sha": obj.get("head_sha"),
+            "run_attempt": self.__to_int(obj.get("run_attempt")),
+            "status": obj.get("status"),
+            "conclusion": obj.get("conclusion"),
+            "started_at": self.__parse_date(obj.get("started_at")),
+            "completed_at": self.__parse_date(obj.get("completed_at")),
+            "steps": self.__create_list_embedded_docs("job_step", obj.get("steps")),
+            "runner_id": self.__to_int(obj.get("runner_id")),
+            "runner_name": obj.get("runner_name"),
+            "runner_group_id": self.__to_int(obj.get("runner_group_id")),
+            "runner_group_name": obj.get("runner_group_name"),
+        }
 
-        keyargs = {"job_id": job_id, "head_sha": head_sha, "runner_id": runner_id}
-        Job.objects(**keyargs).delete()
-
-        job = Job()
-
-        job.job_id = self.__to_int(obj.get("id"))
-        job.name = obj.get("name")
-        job.run_id = self.__run_object_id(self.__to_int(obj.get("run_id")))
-        job.head_sha = head_sha
-        job.run_attempt = self.__to_int(obj.get("run_attempt"))
-        job.status = obj.get("status")
-        job.conclusion = obj.get("conclusion")
-        job.started_at = self.__parse_date(obj.get("started_at"))
-        job.completed_at = self.__parse_date(obj.get("completed_at"))
-        job.steps = self.__create_list_embedded_docs("job_step", obj.get("steps"))
-
-        job.runner_id = runner_id
-        job.runner_name = obj.get("runner_name")
-        job.runner_group_id = (
-            self.__to_int(obj.get("runner_group_id"))
-            if obj.get("runner_group_id")
-            else None
-        )
-        job.runner_group_name = obj.get("runner_group_name")
-
-        return job
+        Job.objects(**temp_dict).upsert_one(**temp_dict)
 
     def __create_job_step(self, obj: dict) -> JobStep:
         """Map object to the appropriate files of JobSteps.
@@ -419,7 +400,7 @@ class Mongo:
 
         return job_step
 
-    def __create_artifact(self, obj: dict) -> Artifact:
+    def __upsert_artifact(self, obj: dict) -> None:
         """Map object to the appropriate files of Artifacts.
 
         Args:
@@ -428,30 +409,27 @@ class Mongo:
         Returns:
             Artifacts: A MongoDB object ready to save.
         """
-        # delete old doecument if any
-        # keep recent data instead of old ones
-        artifact_id = self.__to_int(obj.get("id"))
-        vcs_system_id, project_id = self.__project_object_id(self.project_url)
 
-        keyargs = {"artifact_id": artifact_id, "vcs_system_id": vcs_system_id}
-        Artifact.objects(**keyargs).delete()
+        temp_dict = {
+            "artifact_id": self.__to_int(obj.get("id")),
+            "name": obj.get("name"),
+            "size_in_bytes": self.__to_int(obj.get("size_in_bytes")),
+            "archive_download_url": obj.get("archive_download_url"),
+            "expired": bool(obj.get("expired")),
+            "created_at": self.__parse_date(obj.get("created_at")),
+            "updated_at": self.__parse_date(obj.get("updated_at")),
+            "expires_at": self.__parse_date(obj.get("expires_at")),
+        }
 
-        artifact = Artifact()
+        temp_dict["vcs_system_id"], temp_dict["project_id"] = self.__project_object_id(
+            self.project_url
+        )
 
-        artifact.artifact_id = self.__to_int(obj.get("id"))
-        artifact.name = obj.get("name")
-        artifact.size_in_bytes = self.__to_int(obj.get("size_in_bytes"))
-        artifact.archive_download_url = obj.get("archive_download_url")
-        artifact.expired = bool(obj.get("expired"))
-        artifact.created_at = self.__parse_date(obj.get("created_at"))
-        artifact.updated_at = self.__parse_date(obj.get("updated_at"))
-        artifact.expires_at = self.__parse_date(obj.get("expires_at"))
-        artifact.vcs_system_id, artifact.project_id = vcs_system_id, project_id
+        # if project not yet in vcs_system add the repository url
+        if not temp_dict["project_id"]:
+            temp_dict["project_url"] = self.project_url
 
-        if not artifact.project_id:
-            artifact.project_url = self.project_url
-
-        return artifact
+        Artifact.objects(**temp_dict).upsert_one(**temp_dict)
 
     # ~ query mongo collections
 
