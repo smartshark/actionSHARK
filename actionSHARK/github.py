@@ -15,10 +15,13 @@ class GitHub:
     """
     Managing different type of get Request to fetch data from GitHub REST API"""
 
+    # base url
     api_url = "https://api.github.com/"
 
+    # request header default value
     __headers = {"Accept": "application/vnd.github.v3+json"}
 
+    # API URLs for each action
     actions_url = {
         "workflow": "repos/{owner}/{repo}/actions/workflows?per_page={per_page}",
         "run": "repos/{owner}/{repo}/actions/runs?per_page={per_page}",
@@ -26,26 +29,29 @@ class GitHub:
         "artifact": "repos/{owner}/{repo}/actions/artifacts?per_page={per_page}",
     }
 
-    total_requests = 0
+    # essential variable
     current_action = None
+
+    # tracking requests
+    total_requests = 0
     limit_handler_counter = 0
 
     def __init__(
         self,
+        save_mongo: Callable,
         owner: Optional[str] = None,
         repo: Optional[str] = None,
         per_page: int = 100,
         token: Optional[str] = None,
-        save_mongo: Callable = None,
     ) -> None:
         """Initializing essential variables.
 
         Args:
-            owner (str): Owner of the repository. Defaults to None.
-            repo (str): The repository name. Defaults to None.
+            save_mongo (callable): Callable function to save items in MongoDB.
+            owner (str): Owner of the repository.
+            repo (str): The repository name.
             per_page (int): Number of items in a response. Defaults to 100.
-            save_mongo (callable): Callable function to save items in MongoDB. Defaults to None.
-            sleep_interval (int): Time to wait between requests in seconds. Defaults to 2.
+            token (str): GitHub token to use in header to autherize requests.
         """
 
         # check owner and repo
@@ -61,24 +67,24 @@ class GitHub:
             self.__token = token
             self.__headers["Authorization"] = f"token {token}"
 
-        # MongoDB
+        # MongoDB save function
         self.save_mongo = save_mongo
 
-        # main variables
+        # essential variables
         self.owner = owner
         self.repo = repo
         self.per_page = per_page
 
     def authenticate_user(self):
         """
-        Authenticate passed token by requesting user information."""
+        Authenticate the passed token by requesting user information."""
 
         basic_auth = requests.get(self.api_url + "user", headers=self.__headers)
 
         self.total_requests += 1
 
         # if 401 = 'Unauthorized', but other responses mean the user is authorized
-        # Unauthorized users have much lower limit, 60 per hour
+        # Unauthorized users have much lower limit, 60 per hour.
         if basic_auth.status_code == 401:
 
             logger.error(f"Error authenticated using token")
@@ -104,7 +110,7 @@ class GitHub:
             # append page number to the url
             github_url += f"&page={self.page}"
 
-            # get response
+            # GET response
             response = requests.get(github_url, headers=self.__headers)
 
             self.total_requests += 1
@@ -116,15 +122,23 @@ class GitHub:
                 logger.error(response)
                 sys.exit(1)
 
-            # handle limit
+            # handle number of requests limitation
             if response.status_code == 403:
 
+                # get the next reset time
                 headers_dict = response.headers
+                ratelimit = headers_dict.get("X-RateLimit-Reset")
 
-                reset_time = dt.datetime.fromtimestamp(
-                    int(headers_dict.get("X-RateLimit-Reset"))
-                )
+                if ratelimit:
+                    reset_time = dt.datetime.fromtimestamp(int(ratelimit))
+                else:
+                    logger.error(
+                        f"Error fetching 'X-RateLimit-Reset' from request's header."
+                    )
+                    logger.error(f"The value is: X-RateLimit-Reset = {ratelimit}")
+                    sys.exit(1)
 
+                # calculate the sleep time
                 current_time = dt.datetime.now().replace(microsecond=0)
 
                 sleep_time = (reset_time - current_time).seconds
@@ -137,7 +151,7 @@ class GitHub:
                 )
                 logger.debug(f"Next Restart will be on {reset_time}")
 
-                # long sleep till limit reset
+                # sleep till limit reset
                 sleep(sleep_time)
 
                 logger.debug(
@@ -174,7 +188,7 @@ class GitHub:
                 break
 
     def get_workflows(self) -> None:
-        """Fetching workflows data from GitHub API for specific repository and owner."""
+        """Fetching workflows data from GitHub API."""
 
         # set what action to run and starting page
         self.current_action = "workflow"
@@ -186,6 +200,7 @@ class GitHub:
         )
         github_url = self.api_url + url
 
+        # start fetching
         logger.debug(f"Start fetching workflows")
 
         self.paginating(github_url, "workflows")
@@ -193,7 +208,7 @@ class GitHub:
         logger.debug(f"Finish fetching workflows")
 
     def get_runs(self) -> None:
-        """Fetching workflow runs data from GitHub API for specific repository and owner."""
+        """Fetching workflows' runs data from GitHub API."""
 
         # set what action to run and starting page
         self.current_action = "run"
@@ -205,24 +220,19 @@ class GitHub:
         )
         github_url = self.api_url + url
 
+        # start fetching
         logger.debug(f"Start fetching runs")
 
         self.paginating(github_url, "workflow_runs")
 
         logger.debug(f"Finish fetching runs")
 
-    def get_jobs(self, run_id: int = None) -> None:
-        """Fetching run artifacts data from GitHub API for specific repository, owner, and run.
+    def get_jobs(self, run_id: int) -> None:
+        """Fetching runs' jobs data from GitHub API for specific run id.
 
         Args:
-            run_id (int): The run id. Defaults to None.
+            run_id (int): Run id to get the jobs.
         """
-
-        if not run_id:
-            logger.error(
-                "Please make to sure to pass the owner, repo name, and run id."
-            )
-            sys.exit(1)
 
         # set what action to run and starting page
         self.current_action = "job"
@@ -237,7 +247,7 @@ class GitHub:
         self.paginating(github_url, "jobs")
 
     def get_artifacts(self) -> None:
-        """Fetching run artifacts data from GitHub API for specific repository, owner, and run."""
+        """Fetching artifacts data from GitHub API."""
 
         # set what action to run and starting page
         self.current_action = "artifact"
@@ -249,6 +259,7 @@ class GitHub:
         )
         github_url = self.api_url + url
 
+        # start fetching
         logger.debug(f"Start fetching artifacts")
 
         self.paginating(github_url, "artifacts")
@@ -257,17 +268,17 @@ class GitHub:
 
     def __finishing_message(self):
         """
-        Some log messages to append after finishing run()
+        Finish message to append after finishing run()
         """
         logger.debug(f"Number of requests: {self.total_requests}")
         logger.debug(f"Number of stopping: {self.limit_handler_counter}")
         logger.debug("Finished fetching actions.")
 
     def run(self, runs_object=None) -> None:
-        """Collect all action for a repository.
+        """Collect all action's data form a repository.
 
         Args:
-            runs_object (Document): Runs collection to extract all run ids. Defaults to None.
+            runs_object (Document): Runs collection to extract all run ids.
         """
 
         # verify correct token if any
@@ -283,7 +294,7 @@ class GitHub:
         self.get_artifacts()
         self.get_runs()
 
-        # if Runs object was passed, for each Run get
+        # if Run object was passed, for each run get jobs
         if not runs_object:
             logger.error("Run object is not passed")
             logger.error("Run object is needed to get Jobs")
