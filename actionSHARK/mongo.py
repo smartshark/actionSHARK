@@ -24,6 +24,9 @@ logger = logging.getLogger("main.mongo")
 
 
 class Workflow(Document):
+    """
+    Workflow collection schema"""
+
     workflow_id = IntField()
     name = StringField()
     path = StringField(default=None)
@@ -36,6 +39,9 @@ class Workflow(Document):
 
 
 class RunPullRequest(EmbeddedDocument):
+    """
+    RunPullRequest embedded document schema"""
+
     pull_request_id = IntField()
     pull_request_number = IntField()
 
@@ -51,6 +57,9 @@ class RunPullRequest(EmbeddedDocument):
 
 
 class Run(Document):
+    """
+    Run collection schema"""
+
     run_id = IntField()
     run_number = IntField()
     event = StringField()
@@ -72,6 +81,9 @@ class Run(Document):
 
 
 class JobStep(EmbeddedDocument):
+    """
+    JobStep embedded document schema"""
+
     name = StringField()
     status = StringField()
     conclusion = StringField()
@@ -81,6 +93,9 @@ class JobStep(EmbeddedDocument):
 
 
 class Job(Document):
+    """
+    Job collection schema"""
+
     job_id = IntField()
     name = StringField()
     run_id = ObjectIdField()
@@ -99,6 +114,9 @@ class Job(Document):
 
 
 class Artifact(Document):
+    """
+    Artifact collection schema"""
+
     artifact_id = IntField()
     name = StringField()
     size_in_bytes = IntField(default=None)
@@ -147,7 +165,7 @@ class Mongo:
 
         logger.debug(f"Mongo connected to {db_database}")
 
-    # to pass to github class for fetching jobs
+    # define a property to pass to github class for fetching jobs
     @property
     def runs(self):
         return Run
@@ -160,10 +178,10 @@ class Mongo:
         logger.debug(f"Database { self.db_database } is dropped")
 
     def drop_collection(self, col_name: Optional[str] = None) -> bool:
-        """Drop collection if found.
+        """Drop a collection if found.
 
         Args:
-            col_name (str): Collection name. Defaults to None.
+            col_name (str): Collection name.
         """
 
         # check if collection name is passed
@@ -178,7 +196,7 @@ class Mongo:
             logger.error(f"Collection { col_name } is Not Found")
             return False
 
-        # Delete if found
+        # delete if found
         self.__conn.get_database(self.db_database).drop_collection(col_name)
 
         logger.debug(f"Collection { col_name } is dropped")
@@ -188,11 +206,12 @@ class Mongo:
     def upsert_documents(
         self, documents: Optional[dict] = None, action: Optional[str] = None
     ) -> None:
-        """Loop over Elements, to map and save. This function should be passed to GitHub instance as "save_mongo=save_documents".
+        """Loop over Elements, to save in a collection based on action name.
+        This function should be passed to GitHub instance as "save_mongo=save_documents".
 
         Args:
-            documents (dict): Elements. Defaults to None.
-            action (str): Action name to map objects to. Defaults to None.
+            documents (dict): Elements.
+            action (str): Action name to map objects to.
         """
 
         # check if documents and action are not None
@@ -205,10 +224,10 @@ class Mongo:
             logger.error(f"Action {action} was not found in predefined operations")
             return None
 
-        # call the mapping function
+        # call the saving function for an action
         func = self.__operations[action]
 
-        # map and save all documents
+        # save all documents
         for document in documents:
 
             try:
@@ -218,7 +237,7 @@ class Mongo:
                     f'Failed saving document action:{action}, id:{document["id"]}'
                 )
                 logger.exception(e)
-                # continue to avoid system crash if saving document is failed
+                # continue to avoid system crash if saving document has failed
                 continue
 
     def __create_list_embedded_docs(
@@ -226,10 +245,21 @@ class Mongo:
         sub_operation: Optional[str] = None,
         sub_documents: Optional[List[dict]] = None,
     ) -> Optional[List[Any]]:
+        """
+        Create list of embedded documents for a parent document.
+
+        Args:
+            sub_operation (str): Name of the parent document.
+            sub_documents (dict): List of items to convert to embedded documents.
+
+        Returns:
+            List[Any]: list of all embedded documents.
+        """
 
         if not sub_operation or not sub_documents:
             return []
 
+        # supported embedded documents
         sub_operations = {
             "job_step": self.__create_job_step,
             "run_pull_request": self.__create_run_pull_request,
@@ -241,6 +271,7 @@ class Mongo:
             )
             return []
 
+        # create and return a list of embedded documents
         f = sub_operations[sub_operation]
 
         return [f(d) for d in sub_documents]
@@ -248,13 +279,10 @@ class Mongo:
     # ~ create documents
 
     def __upsert_workflow(self, obj: dict) -> None:
-        """Map object to the appropriate files of Workflows.
+        """Insert or update a Workflow document.
 
         Args:
-            obj (dict): The Object to map.
-
-        Returns:
-            Workflows: A MongoDB object ready to save.
+            obj (dict): The Object to upsert.
         """
 
         temp_dict = {
@@ -270,20 +298,17 @@ class Mongo:
             self.project_url
         )
 
-        # if project not yet in vcs_system add the repository url
+        # if project not yet in vcs_system add the repository url instead
         if not temp_dict["project_id"]:
             temp_dict["project_url"] = self.project_url
 
         Workflow.objects(**temp_dict).upsert_one(**temp_dict)
 
     def __upsert_run(self, obj: dict) -> None:
-        """Map object to the appropriate files of Runs.
+        """Insert or update a Run document.
 
         Args:
-            obj (dict): The Object to map.
-
-        Returns:
-            Runs: A MongoDB object ready to save.
+            obj (dict): The Object to upsert.
         """
 
         temp_dict = {
@@ -323,14 +348,15 @@ class Mongo:
         Run.objects(**temp_dict).upsert_one(**temp_dict)
 
     def __create_run_pull_request(self, obj: dict) -> RunPullRequest:
-        """Map object to the appropriate files of RunPullRequests.
+        """Create an embedded document pull request for a Run document.
 
         Args:
-            obj (dict): The Object to map.
+            obj (dict): The dict to create a RunPullRequest.
 
-        Returns:
-            RunPullRequests: A MongoDB object ready to save.
+        Retuen:
+            RunPullRequest Object
         """
+
         run_pull = RunPullRequest()
 
         run_pull.pull_request_id = self.__to_int(obj.get("id"))
@@ -353,14 +379,12 @@ class Mongo:
         return run_pull
 
     def __upsert_job(self, obj: dict) -> None:
-        """Map object to the appropriate files of Jobs.
+        """Insert or update a Job document.
 
         Args:
-            obj (dict): The Object to map.
-
-        Returns:
-            Jobs: A MongoDB object ready to save.
+            obj (dict): The Object to upsert.
         """
+
         temp_dict = {
             "job_id": self.__to_int(obj.get("id")),
             "name": obj.get("name"),
@@ -381,14 +405,15 @@ class Mongo:
         Job.objects(**temp_dict).upsert_one(**temp_dict)
 
     def __create_job_step(self, obj: dict) -> JobStep:
-        """Map object to the appropriate files of JobSteps.
+        """Create an embedded document step for a Job document.
 
         Args:
-            obj (dict): The Object to map.
+            obj (dict): The dict to create a JobStep.
 
-        Returns:
-            JobSteps: A MongoDB object ready to save.
+        Retuen:
+            JobStep Object
         """
+
         job_step = JobStep()
 
         job_step.name = obj.get("name")
@@ -401,13 +426,10 @@ class Mongo:
         return job_step
 
     def __upsert_artifact(self, obj: dict) -> None:
-        """Map object to the appropriate files of Artifacts.
+        """Insert or update a Artifact document.
 
         Args:
-            obj (dict): The Object to map.
-
-        Returns:
-            Artifacts: A MongoDB object ready to save.
+            obj (dict): The Object to upsert.
         """
 
         temp_dict = {
@@ -455,11 +477,11 @@ class Mongo:
         except Workflow.DoesNotExist:
             r = None
 
-        # create workflow if not found by name or id
+        # create workflow if not found using name or id with 'deleted' state
         if not r:
-            self.__create_workflow(
+            self.__upsert_workflow(
                 {"id": v_workflow_id, "name": v_name, "state": "deleted"}
-            ).save()
+            )
 
         try:
             r = Workflow.objects.get(workflow_id=v_workflow_id).id
@@ -486,8 +508,13 @@ class Mongo:
         try:
             r = VCSSystem.objects.get(url=value)
         except VCSSystem.DoesNotExist:
-            logger.error(f"VCSSystem not found url:{value} to fetch project_id")
+            logger.error(
+                f"VCSSystem does not have the url:{value} to fetch project_id and vcs_system_id"
+            )
+            # if url was not found return None for both ids
             return None, None
+
+        # return both ids if url was found in VCSSystem collection
         return r.id, r.project_id
 
     def __run_object_id(self, value: Optional[int] = None) -> Optional[ObjectIdField]:
@@ -495,7 +522,7 @@ class Mongo:
         Find Run object_id from Run collection.
 
         Args:
-            value (int, optional): Run id. Defaults to None.
+            value (int): Run id.
 
         Returns:
             Optional[ObjectIdField]
@@ -518,7 +545,7 @@ class Mongo:
         Find Run object_id from Run collection.
 
         Args:
-            value (int, optional): Run id. Defaults to None.
+            value (int): Run id.
 
         Returns:
             Optional[ObjectIdField]
@@ -538,9 +565,9 @@ class Mongo:
     # ~ helper functions
 
     def __parse_date(
-        self, value: str = None, is_millisecond: bool = False
+        self, value: Optional[str] = None, is_millisecond: bool = False
     ) -> Optional[dt.datetime]:
-        """Convert Datetime string to actual Datetime.
+        """Convert Datetime string to actual Datetime object.
 
         Args:
             value (str): The datetime string to be converted. Defaults to None.
@@ -562,7 +589,7 @@ class Mongo:
 
     def __to_int(self, value: Optional[str] = None) -> Optional[int]:
         """
-        Converting string to integer if any.
+        Converting string to integer.
 
         Args:
             value (str, optional): The value to convert. Defaults to None.
