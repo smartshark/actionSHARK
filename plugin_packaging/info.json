@@ -29,13 +29,6 @@
             "description": "path to root folder of plugin"
         },
         {
-            "name": "plugin_path",
-            "required": true,
-            "position": 1,
-            "type": "execute",
-            "description": "path to root folder of plugin"
-        },
-        {
             "name": "db_database",
             "required": false,
             "position": 2,
@@ -96,35 +89,35 @@
             "required": false,
             "position": 10,
             "type": "execute",
-            "description": "Environment variable, where token is stored"
-        },
-        {
-            "name": "owner",
-            "required": false,
-            "position": 11,
-            "type": "execute",
-            "description": "Owner name of the repository"
-        },
-        {
-            "name": "repository",
-            "required": false,
-            "position": 12,
-            "type": "execute",
-            "description": "Repository Name"
+            "description": "Environment variable, where GitHub token is stored (Optional if 'token' is used)"
         },
         {
             "name": "repository_url",
             "required": true,
             "position": 13,
             "type": "execute",
-            "description": "Repository URL"
+            "description": "Repository GIT URL"
+        },
+        {
+            "name": "owner",
+            "required": false,
+            "position": 11,
+            "type": "execute",
+            "description": "Owner name of the repository (Optional if 'repository_url' is used)"
+        },
+        {
+            "name": "repository",
+            "required": false,
+            "position": 12,
+            "type": "execute",
+            "description": "Repository Name (Optional if 'repository_url' is used)"
         },
         {
             "name": "debug",
             "required": false,
             "position": 14,
             "type": "execute",
-            "description": "Select the debug level"
+            "description": "Select the log level for debugging [*'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']"
         }
     ]
 }
