@@ -6,7 +6,6 @@ actionSHARK is developed to collect all actions from a GitHub repository using c
 Actions in GitHub are divided to workflows, runs, jobs, and artifacts.
 For more information about actions, please read the GitHub documentation [here](https://docs.github.com/en/actions).
 <br />
-<br />
 
 ### **Installation**:
 
@@ -22,8 +21,6 @@ Then change directory to "actionSHARK":
 cd actionSHARK
 ```
 
-<br />
-
 ### **Create environment and install requirements**:
 
 ```
@@ -31,8 +28,6 @@ python -m venv .env
 source ./.env/Scripts/activate
 pip install -r requirements.txt
 ```
-
-<br />
 
 ### **How to Run**:
 
@@ -55,8 +50,6 @@ To specify a database, username, and password :
 ```
 python main.py -t [token] -ru [repository url] -U [username] -P [password] -DB [database]
 ```
-
-<br />
 
 ### **Command line arguments**:
 
