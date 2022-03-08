@@ -94,21 +94,21 @@
         {
             "name": "repository_url",
             "required": true,
-            "position": 13,
+            "position": 11,
             "type": "execute",
             "description": "Repository GIT URL"
         },
         {
             "name": "owner",
             "required": false,
-            "position": 11,
+            "position": 12,
             "type": "execute",
             "description": "Owner name of the repository (Optional if 'repository_url' is used)"
         },
         {
             "name": "repository",
             "required": false,
-            "position": 12,
+            "position": 13,
             "type": "execute",
             "description": "Repository Name (Optional if 'repository_url' is used)"
         },
