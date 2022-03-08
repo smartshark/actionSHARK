@@ -301,6 +301,9 @@ class Mongo:
         # if project not yet in vcs_system add the repository url instead
         if not temp_dict["project_id"]:
             temp_dict["project_url"] = self.project_url
+            # delete keys with None to avoid errors
+            del temp_dict["vcs_system_id"]
+            del temp_dict["project_id"]
 
         Workflow.objects(**temp_dict).upsert_one(**temp_dict)
 
