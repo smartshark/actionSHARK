@@ -5,6 +5,8 @@ import json
 import datetime as dt
 from typing import Optional
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 class Config:
     def __init__(self, args):
@@ -78,21 +80,22 @@ class Config:
 # modifying logger configuration
 def init_logger(level):
     # load logger configuration
-    with open(
-        "{}/../logger_config.json".format(os.path.dirname(os.path.abspath(__file__))),
-        "r",
-    ) as f:
+    with open(f"{BASE_DIR}/../logger_config.json", "r") as f:
         logging_cfg = json.load(f)
 
     current_time = dt.datetime.strftime(dt.datetime.now(), "%Y-%m-%d_%H-%M-%S")
 
     # add date and time to log file name
-    logging_cfg["handlers"]["debug"]["filename"] = logging_cfg["handlers"]["debug"][
-        "filename"
-    ].replace(".log", f"_{current_time}.log")
-    logging_cfg["handlers"]["error"]["filename"] = logging_cfg["handlers"]["error"][
-        "filename"
-    ].replace(".log", f"{current_time}.log")
+    logging_cfg["handlers"]["debug"]["filename"] = (
+        logging_cfg["handlers"]["debug"]["filename"]
+        .replace(".log", f"_{current_time}.log")
+        .replace("./logs", f"{BASE_DIR}/../logs")
+    )
+    logging_cfg["handlers"]["error"]["filename"] = (
+        logging_cfg["handlers"]["error"]["filename"]
+        .replace(".log", f"{current_time}.log")
+        .replace("./logs", f"{BASE_DIR}/../logs")
+    )
 
     logging_cfg["loggers"]["main"]["level"] = level
 

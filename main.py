@@ -7,9 +7,11 @@ from actionSHARK.config import Config, init_logger
 from actionSHARK.mongo import Mongo
 from actionSHARK.github import GitHub
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # create logs folder
-if not os.path.exists("./logs"):
-    os.mkdir("./logs")
+if not os.path.exists(f"{BASE_DIR}/logs"):
+    os.mkdir(f"{BASE_DIR}/logs")
 
 
 # parsing command line arguments
