@@ -29,6 +29,13 @@
             "description": "path to root folder of plugin"
         },
         {
+            "name": "plugin_path",
+            "required": true,
+            "position": 1,
+            "type": "execute",
+            "description": "path to root folder of plugin"
+        },
+        {
             "name": "db_database",
             "required": false,
             "position": 2,
