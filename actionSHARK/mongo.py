@@ -6,7 +6,7 @@ import logging
 from pycoshark.utils import create_mongodb_uri_string
 from pycoshark.mongomodels import VCSSystem, Commit
 
-from mongoengine import connect
+from mongoengine import connect, ConnectionFailure
 from mongoengine import (
     Document,
     StringField,
@@ -17,7 +17,6 @@ from mongoengine import (
     EmbeddedDocument,
     EmbeddedDocumentListField,
 )
-
 
 # start logger
 logger = logging.getLogger("main.mongo")
@@ -131,15 +130,15 @@ class Artifact(Document):
 
 class Mongo:
     def __init__(
-        self,
-        db_database: str,
-        project_url: str,
-        db_user: Optional[str] = None,
-        db_password: Optional[str] = None,
-        db_hostname: str = "localhost",
-        db_port: int = 27017,
-        db_authentication_database: Optional[str] = None,
-        db_ssl_enabled: bool = False,
+            self,
+            db_database: str,
+            project_url: str,
+            db_user: Optional[str] = None,
+            db_password: Optional[str] = None,
+            db_hostname: str = "localhost",
+            db_port: int = 27017,
+            db_authentication_database: Optional[str] = None,
+            db_ssl_enabled: bool = False,
     ) -> None:
 
         self.__operations = {
@@ -160,8 +159,10 @@ class Mongo:
             db_authentication_database,
             db_ssl_enabled,
         )
-
-        self.__conn = connect(db_database, host=self.__conn_uri)
+        try:
+            self.__conn = connect(db_database, host=self.__conn_uri)
+        except ConnectionFailure:
+            logger.error("Failed to connect to MongoDB")
 
         logger.debug(f"Mongo connected to {db_database}")
 
@@ -175,7 +176,7 @@ class Mongo:
     def drop_database(self) -> None:
         """Drop current connected database."""
         self.__conn.drop_database(self.db_database)
-        logger.debug(f"Database { self.db_database } is dropped")
+        logger.debug(f"Database {self.db_database} is dropped")
 
     def drop_collection(self, col_name: Optional[str] = None) -> bool:
         """Drop a collection if found.
@@ -190,21 +191,21 @@ class Mongo:
 
         # check if collection is in database
         if (
-            col_name
-            not in self.__conn.get_database(self.db_database).list_collection_names()
+                col_name
+                not in self.__conn.get_database(self.db_database).list_collection_names()
         ):
-            logger.error(f"Collection { col_name } is Not Found")
+            logger.error(f"Collection {col_name} is Not Found")
             return False
 
         # delete if found
         self.__conn.get_database(self.db_database).drop_collection(col_name)
 
-        logger.debug(f"Collection { col_name } is dropped")
+        logger.debug(f"Collection {col_name} is dropped")
 
         return True
 
     def upsert_documents(
-        self, documents: Optional[dict] = None, action: Optional[str] = None
+            self, documents: Optional[dict] = None, action: Optional[str] = None
     ) -> None:
         """Loop over Elements, to save in a collection based on action name.
         This function should be passed to GitHub instance as "save_mongo=save_documents".
@@ -241,9 +242,9 @@ class Mongo:
                 continue
 
     def __create_list_embedded_docs(
-        self,
-        sub_operation: Optional[str] = None,
-        sub_documents: Optional[List[dict]] = None,
+            self,
+            sub_operation: Optional[str] = None,
+            sub_documents: Optional[List[dict]] = None,
     ) -> Optional[List[Any]]:
         """
         Create list of embedded documents for a parent document.
@@ -306,6 +307,46 @@ class Mongo:
             del temp_dict["project_id"]
 
         Workflow.objects(**temp_dict).upsert_one(**temp_dict)
+
+    def update_last_updated(self) -> None:
+        """
+        Updates the last_updated for a VCS system with the associated project URL.
+
+        This function retrieves a VCS system using the project URL and updates its last_updated
+        to the current date and time.
+
+        :return: None
+        """
+        try:
+            r = VCSSystem.objects.get(url=self.project_url)
+            r.last_updated = dt.datetime.now()
+            r.save()
+
+        except VCSSystem.DoesNotExist:
+            logger.error(
+                f"VCSSystem does not have the url:{self.project_url} to fetch project_id and vcs_system_id"
+            )
+
+    def get_last_updated(self) -> Optional[DateTimeField]:
+        """
+        Retrieves the last_updated  for a VCS system with the associated project URL.
+
+        This function attempts to fetch a VCS system using the project URL and returns its last_updated
+         if found. If the VCS system does not exist, it logs an error and returns None.
+
+        :return: The last_updated  if available, otherwise None.
+        """
+
+        try:
+            r = VCSSystem.objects.get(url=self.project_url)
+
+        except VCSSystem.DoesNotExist:
+            logger.error(
+                f"VCSSystem does not have the url:{self.project_url} to fetch project_id and vcs_system_id"
+            )
+            return None
+
+        return r.last_updated
 
     def __upsert_run(self, obj: dict) -> None:
         """Insert or update a Run document.
@@ -459,7 +500,7 @@ class Mongo:
     # ~ query mongo collections
 
     def __workflow_object_id(
-        self, v_workflow_id: Optional[int] = None, v_name: Optional[str] = None
+            self, v_workflow_id: Optional[int] = None, v_name: Optional[str] = None
     ) -> Optional[ObjectIdField]:
         """
         Find Workflow object_id from Workflow collection.
@@ -497,7 +538,7 @@ class Mongo:
         return r
 
     def __project_object_id(
-        self, value: str
+            self, value: str
     ) -> Tuple[Optional[ObjectIdField], Optional[ObjectIdField]]:
         """
         Find Repository project id from VCSSystem collection.
@@ -542,7 +583,7 @@ class Mongo:
         return r
 
     def __commit_object_id(
-        self, value: Optional[str] = None
+            self, value: Optional[str] = None
     ) -> Optional[ObjectIdField]:
         """
         Find Run object_id from Run collection.
@@ -568,7 +609,7 @@ class Mongo:
     # ~ helper functions
 
     def __parse_date(
-        self, value: Optional[str] = None, is_millisecond: bool = False
+            self, value: Optional[str] = None, is_millisecond: bool = False
     ) -> Optional[dt.datetime]:
         """Convert Datetime string to actual Datetime object.
 

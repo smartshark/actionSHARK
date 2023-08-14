@@ -1,7 +1,7 @@
 import os
 import logging
 import logging.config
-
+import sys
 import pycoshark.utils as utils
 from actionSHARK.config import Config, init_logger
 from actionSHARK.mongo import Mongo
@@ -80,6 +80,14 @@ def main():
     # Start logger
     init_logger(cfg.logger_level)
     logger = logging.getLogger("main")
+    i = logging.StreamHandler(sys.stdout)
+    e = logging.StreamHandler(sys.stderr)
+
+    i.setLevel(logging.DEBUG)
+    e.setLevel(logging.ERROR)
+
+    logger.addHandler(i)
+    logger.addHandler(e)
     logger.debug("Start Logging")
 
     # initiate mongo instance
@@ -101,9 +109,10 @@ def main():
         token=cfg.token,
         save_mongo=mongo.upsert_documents,
     )
-
+    last_updated = mongo.get_last_updated()
     # get all actions
-    github.run(mongo.runs)
+    github.run(last_updated)
+    mongo.update_last_updated()
 
     # Finish logging message
     logger.debug("Finish Logging")

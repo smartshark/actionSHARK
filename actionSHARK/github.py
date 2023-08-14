@@ -74,6 +74,7 @@ class GitHub:
         self.owner = owner
         self.repo = repo
         self.per_page = per_page
+        self.runs_ids = []
 
     def authenticate_user(self):
         """
@@ -169,6 +170,11 @@ class GitHub:
             # count number of items
             response_count = len(response_JSON)
 
+            if self.current_action == 'run':
+                if response_count > 0:
+                    runs = [run['id'] for run in response_JSON]
+                    self.runs_ids.extend(runs)
+
             # if no items, jump to next action
             if not response_JSON:
                 break
@@ -207,8 +213,12 @@ class GitHub:
 
         logger.debug(f"Finish fetching workflows")
 
-    def get_runs(self) -> None:
-        """Fetching workflows' runs data from GitHub API."""
+    def get_runs(self, last_updated=None) -> None:
+        """Fetching workflows' runs data from GitHub API.
+
+        Args:
+            last_updated(Datetime): last_updated for a VCS system.
+        """
 
         # set what action to run and starting page
         self.current_action = "run"
@@ -218,6 +228,10 @@ class GitHub:
         url = self.actions_url["run"].format(
             owner=self.owner, repo=self.repo, per_page=self.per_page
         )
+        if last_updated is not None:
+            year_month_day_format = '%Y-%m-%d'
+            date = last_updated.strftime(year_month_day_format)
+            url = url + '&created=>' + date
         github_url = self.api_url + url
 
         # start fetching
@@ -274,11 +288,11 @@ class GitHub:
         logger.debug(f"Number of stopping: {self.limit_handler_counter}")
         logger.debug("Finished fetching actions.")
 
-    def run(self, runs_object=None) -> None:
+    def run(self, last_updated=None) -> None:
         """Collect all action's data form a repository.
 
         Args:
-            runs_object (Document): Runs collection to extract all run ids.
+            last_updated (Datetime): last_updated for a VCS system.
         """
 
         # verify correct token if any
@@ -292,22 +306,11 @@ class GitHub:
         # fetching actions
         self.get_workflows()
         self.get_artifacts()
-        self.get_runs()
+        self.get_runs(last_updated)
 
-        # if Run object was passed, for each run get jobs
-        if not runs_object:
-            logger.error("Run object is not passed")
-            logger.error("Run object is needed to get Jobs")
-            self.__finishing_message()
-            sys.exit(1)
-
-        # collect ids in a list to avoid cursor timeout
-        logger.debug("Collecting run ids")
-        run_ids = [run.run_id for run in runs_object.objects()]
-
-        # logger is used here to not log each time the function excutes
+        # logger is used here to not log each time the function executes
         logger.debug(f"Start fetching jobs")
-        for run in run_ids:
+        for run in self.runs_ids:
             self.get_jobs(run)
         logger.debug(f"Finish fetching jobs")
 
