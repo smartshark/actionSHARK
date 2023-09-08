@@ -3,9 +3,13 @@ import logging
 import logging.config
 import sys
 import pycoshark.utils as utils
+import datetime
 from actionSHARK.config import Config, init_logger
 from actionSHARK.mongo import Mongo
 from actionSHARK.github import GitHub
+from pycoshark.mongomodels import Project, CISystem
+from mongoengine import connect, ConnectionFailure
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -59,6 +63,7 @@ def collect_args():
         required=False,
         type=str,
     )
+    parser.add_argument('-pn', '--project-name', help='Name of the project.', required=True)
 
     # General
     parser.add_argument(
@@ -91,9 +96,9 @@ def main():
     logger.debug("Start Logging")
 
     # initiate mongo instance
-    mongo = Mongo(
-        cfg.db_database,
-        cfg.url,
+
+    # get all actions
+    conn_uri = utils.create_mongodb_uri_string(
         cfg.db_user,
         cfg.db_password,
         cfg.db_hostname,
@@ -101,7 +106,32 @@ def main():
         cfg.db_authentication,
         cfg.db_ssl,
     )
+    try:
+        conn = connect(cfg.db_database, host=conn_uri)
+    except ConnectionFailure:
+        conn=None
+        logger.error("Failed to connect to MongoDB")
 
+    try:
+        project = Project.objects.get(name=cfg.project_name)
+    except Project.DoesNotExist:
+        logger.error('Project %s not found!', cfg.project_name)
+        sys.exit(1)
+
+    try:
+        ci_system = CISystem.objects.get(url=cfg.tracking_url, project_id=project.id)
+    except CISystem.DoesNotExist:
+        ci_system = CISystem(project_id=project.id, url=cfg.tracking_url)
+
+    last_updated = ci_system.last_updated
+    ci_system.save()
+
+    mongo = Mongo(
+        cfg.db_database,
+        cfg.url,
+        ci_system,
+        conn
+        )
     # initiate GitHub instance
     github = GitHub(
         owner=cfg.owner,
@@ -109,10 +139,10 @@ def main():
         token=cfg.token,
         save_mongo=mongo.upsert_documents,
     )
-    last_updated = mongo.get_last_updated()
-    # get all actions
     github.run(last_updated)
-    mongo.update_last_updated()
+
+    ci_system.last_updated = datetime.datetime.now()
+    ci_system.save()
 
     # Finish logging message
     logger.debug("Finish Logging")

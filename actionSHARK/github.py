@@ -105,8 +105,10 @@ class GitHub:
         Args:
             github_url (str): GitHub API url to loop over and collect responses.
             checker (str, optional): The key to the element, who has all items. Defaults to None.
+        Returns:
+            result (list): List of JSON entries.
         """
-
+        result = []
         while True:
             # append page number to the url
             github_url += f"&page={self.page}"
@@ -126,39 +128,7 @@ class GitHub:
             # handle number of requests limitation
             if response.status_code == 403:
 
-                # get the next reset time
-                headers_dict = response.headers
-                ratelimit = headers_dict.get("X-RateLimit-Reset")
-
-                if ratelimit:
-                    reset_time = dt.datetime.fromtimestamp(int(ratelimit))
-                else:
-                    logger.error(
-                        f"Error fetching 'X-RateLimit-Reset' from request's header."
-                    )
-                    logger.error(f"The value is: X-RateLimit-Reset = {ratelimit}")
-                    sys.exit(1)
-
-                # calculate the sleep time
-                current_time = dt.datetime.now().replace(microsecond=0)
-
-                sleep_time = (reset_time - current_time).seconds
-
-                self.limit_handler_counter += 1
-
-                logger.debug(f"Limit handler is triggered")
-                logger.debug(
-                    f"Program will sleep for approximately {sleep_time:n} seconds."
-                )
-                logger.debug(f"Next Restart will be on {reset_time}")
-
-                # sleep till limit reset
-                sleep(sleep_time)
-
-                logger.debug(
-                    f"Continue with fetching {self.current_action} from last GET request"
-                )
-
+                self.rate_limit_handler(response)
                 # after sleeping restart last loop to continue from last action
                 continue
 
@@ -166,21 +136,13 @@ class GitHub:
             response_JSON = response.json()
             if checker:
                 response_JSON = response_JSON.get(checker)
-
+                result.extend(response_JSON)
             # count number of items
             response_count = len(response_JSON)
-
-            if self.current_action == 'run':
-                if response_count > 0:
-                    runs = [run['id'] for run in response_JSON]
-                    self.runs_ids.extend(runs)
 
             # if no items, jump to next action
             if not response_JSON:
                 break
-
-            # save items to mongodb
-            self.save_mongo(response_JSON, self.current_action)
 
             # handel page incrementing
             github_url = github_url[: -len(f"&page={self.page}")]
@@ -192,6 +154,46 @@ class GitHub:
             # break after saving if number of items is less than per_page
             if response_count < self.per_page:
                 break
+        return result
+
+    def rate_limit_handler(self, response):
+        """
+        Handles rate limiting for API requests by calculating the time until the rate limit is reset and sleeping for that duration
+        before continuing with the next API request.
+
+
+        Args:
+            response(requests.Response): The response object from the API request.
+
+        Returns:
+            None
+
+        """
+        # get the next reset time
+        headers_dict = response.headers
+        ratelimit = headers_dict.get("X-RateLimit-Reset")
+        if ratelimit:
+            reset_time = dt.datetime.fromtimestamp(int(ratelimit))
+        else:
+            logger.error(
+                f"Error fetching 'X-RateLimit-Reset' from request's header."
+            )
+            logger.error(f"The value is: X-RateLimit-Reset = {ratelimit}")
+            sys.exit(1)
+        # calculate the sleep time
+        current_time = dt.datetime.now().replace(microsecond=0)
+        sleep_time = (reset_time - current_time).seconds
+        self.limit_handler_counter += 1
+        logger.debug(f"Limit handler is triggered")
+        logger.debug(
+            f"Program will sleep for approximately {sleep_time:n} seconds."
+        )
+        logger.debug(f"Next Restart will be on {reset_time}")
+        # sleep till limit reset
+        sleep(sleep_time)
+        logger.debug(
+            f"Continue with fetching {self.current_action} from last GET request"
+        )
 
     def get_workflows(self) -> None:
         """Fetching workflows data from GitHub API."""
@@ -209,8 +211,10 @@ class GitHub:
         # start fetching
         logger.debug(f"Start fetching workflows")
 
-        self.paginating(github_url, "workflows")
+        result = self.paginating(github_url, "workflows")
 
+        # save items to mongodb
+        self.save_mongo(result, "workflow")
         logger.debug(f"Finish fetching workflows")
 
     def get_runs(self, last_updated=None) -> None:
@@ -237,7 +241,11 @@ class GitHub:
         # start fetching
         logger.debug(f"Start fetching runs")
 
-        self.paginating(github_url, "workflow_runs")
+        result = self.paginating(github_url, "workflow_runs")
+
+        if len(result) > 0:
+            self.runs_ids = [run['id'] for run in result]
+            self.save_mongo(result, "run")
 
         logger.debug(f"Finish fetching runs")
 
@@ -258,7 +266,9 @@ class GitHub:
         )
         github_url = self.api_url + url
 
-        self.paginating(github_url, "jobs")
+        result = self.paginating(github_url, "jobs")
+        if len(result) > 0:
+            self.save_mongo(result, "job")
 
     def get_artifacts(self) -> None:
         """Fetching artifacts data from GitHub API."""
@@ -276,7 +286,8 @@ class GitHub:
         # start fetching
         logger.debug(f"Start fetching artifacts")
 
-        self.paginating(github_url, "artifacts")
+        result = self.paginating(github_url, "artifacts")
+        self.save_mongo(result, "artifact")
 
         logger.debug(f"Finish fetching artifacts")
 

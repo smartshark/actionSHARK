@@ -2,130 +2,12 @@ import sys
 import datetime as dt
 from typing import Optional, Any, Tuple, List
 import logging
-
-from pycoshark.utils import create_mongodb_uri_string
-from pycoshark.mongomodels import VCSSystem, Commit
-
-from mongoengine import connect, ConnectionFailure
-from mongoengine import (
-    Document,
-    StringField,
-    DateTimeField,
-    IntField,
-    BooleanField,
-    ObjectIdField,
-    EmbeddedDocument,
-    EmbeddedDocumentListField,
-)
+from pycoshark.mongomodels import VCSSystem, Commit, Workflow, RunPullRequest, Run, JobStep, Job, Artifact, CISystem
+from mongoengine import connection
+from mongoengine import ObjectIdField
 
 # start logger
 logger = logging.getLogger("main.mongo")
-
-
-class Workflow(Document):
-    """
-    Workflow collection schema"""
-
-    workflow_id = IntField()
-    name = StringField()
-    path = StringField(default=None)
-    state = StringField()
-    created_at = DateTimeField()
-    updated_at = DateTimeField()
-    project_url = StringField(default=None)
-    project_id = ObjectIdField(default=None)
-    vcs_system_id = ObjectIdField(default=None)
-
-
-class RunPullRequest(EmbeddedDocument):
-    """
-    RunPullRequest embedded document schema"""
-
-    pull_request_id = IntField()
-    pull_request_number = IntField()
-
-    target_id = IntField()
-    target_branch = StringField()
-    target_sha = StringField()
-    target_url = StringField()
-
-    source_id = IntField()
-    source_branch = StringField()
-    source_sha = StringField()
-    source_url = StringField()
-
-
-class Run(Document):
-    """
-    Run collection schema"""
-
-    run_id = IntField()
-    run_number = IntField()
-    event = StringField()
-    status = StringField()
-    conclusion = StringField()
-    workflow_id = ObjectIdField()
-    pull_requests = EmbeddedDocumentListField(RunPullRequest, default=[])
-    created_at = DateTimeField()
-    updated_at = DateTimeField()
-    run_attempt = IntField()
-    run_started_at = DateTimeField(default=None)
-
-    triggering_commit_id = ObjectIdField(default=None)
-    triggering_repository_url = StringField(default=None)
-    triggering_commit_sha = StringField()
-    triggering_commit_branch = StringField()
-    triggering_commit_message = StringField()
-    triggering_commit_timestamp = DateTimeField()
-
-
-class JobStep(EmbeddedDocument):
-    """
-    JobStep embedded document schema"""
-
-    name = StringField()
-    status = StringField()
-    conclusion = StringField()
-    number = IntField()
-    started_at = DateTimeField()
-    completed_at = DateTimeField()
-
-
-class Job(Document):
-    """
-    Job collection schema"""
-
-    job_id = IntField()
-    name = StringField()
-    run_id = ObjectIdField()
-    head_sha = StringField()
-    run_attempt = IntField()
-    status = StringField()
-    conclusion = StringField()
-    started_at = DateTimeField()
-    completed_at = DateTimeField()
-    steps = EmbeddedDocumentListField(JobStep, default=[])
-
-    runner_id = IntField()
-    runner_name = StringField()
-    runner_group_id = IntField()
-    runner_group_name = StringField()
-
-
-class Artifact(Document):
-    """
-    Artifact collection schema"""
-
-    artifact_id = IntField()
-    name = StringField()
-    size_in_bytes = IntField(default=None)
-    archive_download_url = StringField(default=None)
-    expired = BooleanField()
-    created_at = DateTimeField()
-    updated_at = DateTimeField()
-    expires_at = DateTimeField()
-    project_id = ObjectIdField(default=None)
-    vcs_system_id = ObjectIdField(default=None)
 
 
 class Mongo:
@@ -133,14 +15,13 @@ class Mongo:
             self,
             db_database: str,
             project_url: str,
-            db_user: Optional[str] = None,
-            db_password: Optional[str] = None,
-            db_hostname: str = "localhost",
-            db_port: int = 27017,
-            db_authentication_database: Optional[str] = None,
-            db_ssl_enabled: bool = False,
+            ci_system: CISystem,
+            conn: connection,
+
     ) -> None:
 
+        self.ci_system = ci_system
+        self.__conn = conn
         self.__operations = {
             "workflow": self.__upsert_workflow,
             "run": self.__upsert_run,
@@ -150,19 +31,6 @@ class Mongo:
 
         self.db_database = db_database
         self.project_url = project_url
-
-        self.__conn_uri = create_mongodb_uri_string(
-            db_user,
-            db_password,
-            db_hostname,
-            db_port,
-            db_authentication_database,
-            db_ssl_enabled,
-        )
-        try:
-            self.__conn = connect(db_database, host=self.__conn_uri)
-        except ConnectionFailure:
-            logger.error("Failed to connect to MongoDB")
 
         logger.debug(f"Mongo connected to {db_database}")
 
@@ -287,13 +155,15 @@ class Mongo:
         """
 
         temp_dict = {
-            "workflow_id": self.__to_int(obj.get("id")),
+            "ci_system_id": self.ci_system.id,
+            "external_id": str(obj.get("id")),
             "name": obj.get("name"),
             "path": obj.get("path"),
             "state": obj.get("state"),
             "created_at": self.__parse_date(obj.get("created_at"), True),
             "updated_at": self.__parse_date(obj.get("updated_at"), True),
         }
+
 
         temp_dict["vcs_system_id"], temp_dict["project_id"] = self.__project_object_id(
             self.project_url
@@ -306,47 +176,7 @@ class Mongo:
             del temp_dict["vcs_system_id"]
             del temp_dict["project_id"]
 
-        Workflow.objects(**temp_dict).upsert_one(**temp_dict)
-
-    def update_last_updated(self) -> None:
-        """
-        Updates the last_updated for a VCS system with the associated project URL.
-
-        This function retrieves a VCS system using the project URL and updates its last_updated
-        to the current date and time.
-
-        :return: None
-        """
-        try:
-            r = VCSSystem.objects.get(url=self.project_url)
-            r.last_updated = dt.datetime.now()
-            r.save()
-
-        except VCSSystem.DoesNotExist:
-            logger.error(
-                f"VCSSystem does not have the url:{self.project_url} to fetch project_id and vcs_system_id"
-            )
-
-    def get_last_updated(self) -> Optional[DateTimeField]:
-        """
-        Retrieves the last_updated  for a VCS system with the associated project URL.
-
-        This function attempts to fetch a VCS system using the project URL and returns its last_updated
-         if found. If the VCS system does not exist, it logs an error and returns None.
-
-        :return: The last_updated  if available, otherwise None.
-        """
-
-        try:
-            r = VCSSystem.objects.get(url=self.project_url)
-
-        except VCSSystem.DoesNotExist:
-            logger.error(
-                f"VCSSystem does not have the url:{self.project_url} to fetch project_id and vcs_system_id"
-            )
-            return None
-
-        return r.last_updated
+        Workflow.objects(ci_system_id=temp_dict['ci_system_id'], external_id=temp_dict['external_id']).update_one(upsert=True, **temp_dict)
 
     def __upsert_run(self, obj: dict) -> None:
         """Insert or update a Run document.
@@ -356,13 +186,13 @@ class Mongo:
         """
 
         temp_dict = {
-            "run_id": self.__to_int(obj.get("id")),
+            "external_id": str(obj.get("id")),
             "run_number": self.__to_int(obj.get("run_number")),
             "event": obj.get("event"),
             "status": obj.get("status"),
             "conclusion": obj.get("conclusion"),
             "workflow_id": self.__workflow_object_id(
-                v_workflow_id=self.__to_int(obj.get("workflow_id")),
+                v_workflow_id=obj.get("workflow_id"),
                 v_name=obj.get("name"),
             ),
             "pull_requests": self.__create_list_embedded_docs(
@@ -389,7 +219,7 @@ class Mongo:
         if triggering_commit_id:
             temp_dict["triggering_commit_id"] = triggering_commit_id
 
-        Run.objects(**temp_dict).upsert_one(**temp_dict)
+        Run.objects(workflow_id= temp_dict['workflow_id'], external_id=temp_dict['external_id']).update_one(upsert=True, **temp_dict)
 
     def __create_run_pull_request(self, obj: dict) -> RunPullRequest:
         """Create an embedded document pull request for a Run document.
@@ -430,9 +260,9 @@ class Mongo:
         """
 
         temp_dict = {
-            "job_id": self.__to_int(obj.get("id")),
+            "external_id": str(obj.get("id")),
             "name": obj.get("name"),
-            "run_id": self.__run_object_id(self.__to_int(obj.get("run_id"))),
+            "run_id": self.__run_object_id(obj.get("run_id")),
             "head_sha": obj.get("head_sha"),
             "run_attempt": self.__to_int(obj.get("run_attempt")),
             "status": obj.get("status"),
@@ -446,7 +276,7 @@ class Mongo:
             "runner_group_name": obj.get("runner_group_name"),
         }
 
-        Job.objects(**temp_dict).upsert_one(**temp_dict)
+        Job.objects(run_id=temp_dict['run_id'], external_id=temp_dict['external_id']).update_one(upsert=True, **temp_dict)
 
     def __create_job_step(self, obj: dict) -> JobStep:
         """Create an embedded document step for a Job document.
@@ -477,7 +307,8 @@ class Mongo:
         """
 
         temp_dict = {
-            "artifact_id": self.__to_int(obj.get("id")),
+            "external_id": str(obj.get("id")),
+            "ci_system_id": self.ci_system.id,
             "name": obj.get("name"),
             "size_in_bytes": self.__to_int(obj.get("size_in_bytes")),
             "archive_download_url": obj.get("archive_download_url"),
@@ -495,7 +326,7 @@ class Mongo:
         if not temp_dict["project_id"]:
             temp_dict["project_url"] = self.project_url
 
-        Artifact.objects(**temp_dict).upsert_one(**temp_dict)
+        Artifact.objects(ci_system_id= temp_dict['ci_system_id'], external_id=temp_dict['external_id']).update_one(upsert=True, **temp_dict)
 
     # ~ query mongo collections
 
@@ -517,7 +348,7 @@ class Mongo:
             return None
 
         try:
-            r = Workflow.objects.get(workflow_id=v_workflow_id).id
+            r = Workflow.objects.get(external_id=str(v_workflow_id), ci_system_id=self.ci_system.id).id
         except Workflow.DoesNotExist:
             r = None
 
@@ -528,7 +359,7 @@ class Mongo:
             )
 
         try:
-            r = Workflow.objects.get(workflow_id=v_workflow_id).id
+            r = Workflow.objects.get(external_id=str(v_workflow_id), ci_system_id=self.ci_system.id).id
         except Workflow.DoesNotExist:
             logger.error(
                 f"Workflow not found, workflow_id:{v_workflow_id}, name:{v_name}"
@@ -576,7 +407,7 @@ class Mongo:
             return None
 
         try:
-            r = Run.objects.get(run_id=value).id
+            r = Run.objects.get(external_id=str(value)).id
         except Run.DoesNotExist:
             logger.error(f"Run not found run_id:{value}")
             r = None
