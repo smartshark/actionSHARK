@@ -6,16 +6,19 @@
     "linux_libraries": [],
     "created_collections": [
         {
-            "name": "workflow"
+            "name": "ci_system"
         },
         {
-            "name": "run"
+            "name": "action_workflow"
         },
         {
-            "name": "job"
+            "name": "action_run"
         },
         {
-            "name": "artifact"
+            "name": "action_job"
+        },
+        {
+            "name": "run_artifact"
         }
     ],
     "description": "Plugin to collect actions data for a github repository.",
@@ -125,6 +128,13 @@
             "position": 14,
             "type": "execute",
             "description": "Select the log level for debugging [*'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']"
+        },
+        {
+            "name": "project_name",
+            "required": true,
+            "position": 15,
+            "type": "execute",
+            "description": "name of the project to which the CI system belongs"
         }
     ]
 }

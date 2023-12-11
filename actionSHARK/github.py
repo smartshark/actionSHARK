@@ -1,11 +1,12 @@
 from typing import Callable, Optional
 from time import sleep
-import os
 import sys
 import datetime as dt
 import requests
 import logging
-
+from pycoshark.mongomodels import CiSystem, Project, ActionWorkflow, ActionRun, ActionJob, RunArtifact
+from .utils import parse_date, to_int, format_repository_url, run_head_repository_url, commit_object_id, create_job_step, create_pull_requests
+from deepdiff import DeepDiff
 
 # start logger
 logger = logging.getLogger("main.github")
@@ -24,9 +25,9 @@ class GitHub:
     # API URLs for each action
     actions_url = {
         "workflow": "repos/{owner}/{repo}/actions/workflows?per_page={per_page}",
-        "run": "repos/{owner}/{repo}/actions/runs?per_page={per_page}",
+        "run": "repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs?per_page={per_page}",
         "job": "repos/{owner}/{repo}/actions/runs/{run_id}/jobs?per_page={per_page}",
-        "artifact": "repos/{owner}/{repo}/actions/artifacts?per_page={per_page}",
+        "artifact": "repos/{owner}/{repo}/actions/runs/{run_id}/artifacts?per_page={per_page}",
     }
 
     # essential variable
@@ -38,7 +39,8 @@ class GitHub:
 
     def __init__(
         self,
-        save_mongo: Callable,
+        project: Project,
+        tracking_url: Optional[str] = None,
         owner: Optional[str] = None,
         repo: Optional[str] = None,
         per_page: int = 100,
@@ -47,15 +49,18 @@ class GitHub:
         """Initializing essential variables.
 
         Args:
-            save_mongo (callable): Callable function to save items in MongoDB.
             owner (str): Owner of the repository.
             repo (str): The repository name.
             per_page (int): Number of items in a response. Defaults to 100.
             token (str): GitHub token to use in header to autherize requests.
         """
-
+        self.workflow_id = None
+        self.run_id = None
+        self.parsed_actions = {'workflows': {}, 'runs': {}, 'jobs': {}, 'artifacts': {}}
+        self.old_actions = {'workflows': {}}
+        self.actions_diff = {}
         # check owner and repo
-        if not owner or not repo or not save_mongo:
+        if not owner or not repo:
             logger.error(
                 f"Please make to sure to pass owner and repo names and save_mongo function."
             )
@@ -67,14 +72,12 @@ class GitHub:
             self.__token = token
             self.__headers["Authorization"] = f"token {token}"
 
-        # MongoDB save function
-        self.save_mongo = save_mongo
-
         # essential variables
         self.owner = owner
         self.repo = repo
         self.per_page = per_page
-        self.runs_ids = []
+        self.project = project
+        self.tracking_url = tracking_url
 
     def authenticate_user(self):
         """
@@ -213,15 +216,39 @@ class GitHub:
 
         result = self.paginating(github_url, "workflows")
 
-        # save items to mongodb
-        self.save_mongo(result, "workflow")
+        for workflow in result:
+            self.workflow_id = str(workflow.get("id"))
+            try:
+                mongo_workflow = ActionWorkflow.objects.get(ci_system_ids=self.last_system_id, external_id=self.workflow_id)
+                self.old_actions['workflows'][self.workflow_id] = mongo_workflow
+            except ActionWorkflow.DoesNotExist:
+                mongo_workflow = None
+
+            new_workflow = ActionWorkflow(ci_system_ids=[self.ci_system.id], external_id=self.workflow_id)
+            new_workflow.name = workflow.get("name")
+            new_workflow.path = workflow.get("path")
+            new_workflow.state = workflow.get("state")
+            new_workflow.created_at = parse_date(workflow.get("created_at"), True)
+            new_workflow.updated_at = parse_date(workflow.get("updated_at"), True)
+            new_workflow.project = self.project.id
+
+            self.parsed_actions['workflows'][self.workflow_id] = new_workflow
+
+            self.check_diff_workflow(mongo_workflow, new_workflow)
+            self.get_runs(mongo_workflow)
+
         logger.debug(f"Finish fetching workflows")
 
-    def get_runs(self, last_updated=None) -> None:
-        """Fetching workflows' runs data from GitHub API.
+    def get_runs(self, mongo_workflow) -> None:
+        """
+          Fetches workflow runs data from the GitHub API.
 
-        Args:
-            last_updated(Datetime): last_updated for a VCS system.
+          Args:
+              mongo_workflow: MongoWorkflow
+                  An optional MongoWorkflow object for comparison with existing data in the database.
+
+          Returns:
+              None
         """
 
         # set what action to run and starting page
@@ -230,30 +257,61 @@ class GitHub:
 
         # constructing the GET url
         url = self.actions_url["run"].format(
-            owner=self.owner, repo=self.repo, per_page=self.per_page
+            owner=self.owner, repo=self.repo, workflow_id=self.workflow_id, per_page=self.per_page
         )
-        if last_updated is not None:
-            year_month_day_format = '%Y-%m-%d'
-            date = last_updated.strftime(year_month_day_format)
-            url = url + '&created=>' + date
+
         github_url = self.api_url + url
 
         # start fetching
-        logger.debug(f"Start fetching runs")
-
         result = self.paginating(github_url, "workflow_runs")
 
-        if len(result) > 0:
-            self.runs_ids = [run['id'] for run in result]
-            self.save_mongo(result, "run")
+        for run in result:
+            self.run_id = str(run.get("id"))
+            logger.debug(f"Start fetching run {self.run_id}")
+            mongo_run = None
+            if mongo_workflow:
+                try:
+                    mongo_run = ActionRun.objects.get(workflow_id=mongo_workflow.id, external_id=self.run_id)
+                except ActionRun.DoesNotExist:
+                    mongo_run = None
+
+            new_run = ActionRun(external_id=str(run.get("id")))
+            new_run.run_number = to_int(run.get("run_number"))
+            new_run.event = run.get("event")
+            new_run.status = run.get("status")
+            new_run.conclusion = run.get("conclusion")
+            f = create_pull_requests
+            new_run.pull_requests = [f(d) for d in run.get("pull_requests")]
+            new_run.created_at = parse_date(run.get("created_at"))
+            new_run.updated_at = parse_date(run.get("updated_at"))
+            new_run.run_started_at = parse_date(run.get("run_started_at"))
+            new_run.run_attempt = to_int(run.get("run_attempt"))
+            new_run.triggering_commit_sha = run.get("head_sha")
+            new_run.triggering_commit_branch = run.get("head_branch")
+            new_run.triggering_commit_message = run["head_commit"].get("message")
+            new_run.triggering_commit_timestamp = run["head_commit"].get("timestamp")
+            if run.get("head_repository"):
+                new_run.triggering_repository_url = run_head_repository_url(run["head_repository"].get("full_name"))
+            new_run.triggering_commit_id = commit_object_id(run.get("head_sha"))
+
+            if self.workflow_id not in self.parsed_actions['runs']:
+                self.parsed_actions['runs'][self.workflow_id] = {}
+            self.parsed_actions['runs'][self.workflow_id][self.run_id] = new_run
+            self.check_diff_run(mongo_run, new_run)
+            self.get_jobs(mongo_run)
+            self.get_artifacts(mongo_run)
 
         logger.debug(f"Finish fetching runs")
 
-    def get_jobs(self, run_id: int) -> None:
-        """Fetching runs' jobs data from GitHub API for specific run id.
+    def get_jobs(self, mongo_run) -> None:
+        """
+         Fetches run jobs data from the GitHub API for a specific run id.
 
-        Args:
-            run_id (int): Run id to get the jobs.
+         Args:
+             mongo_run: MongoRun
+                 An optional MongoRun object for comparison with existing data in the database.
+         Returns:
+             None
         """
 
         # set what action to run and starting page
@@ -262,15 +320,41 @@ class GitHub:
 
         # constructing the GET url
         url = self.actions_url["job"].format(
-            owner=self.owner, repo=self.repo, run_id=run_id, per_page=self.per_page
+            owner=self.owner, repo=self.repo, run_id=self.run_id, per_page=self.per_page
         )
         github_url = self.api_url + url
 
         result = self.paginating(github_url, "jobs")
-        if len(result) > 0:
-            self.save_mongo(result, "job")
 
-    def get_artifacts(self) -> None:
+        for job in result:
+            mongo_job = None
+            if mongo_run:
+                try:
+                    mongo_job = ActionJob.objects.get(run_id=mongo_run.id, external_id=str(job.get("id")))
+                except ActionJob.DoesNotExist:
+                    mongo_job = None
+
+            new_job = ActionJob(external_id=str(job.get("id")))
+            new_job.name = job.get("name")
+            new_job.head_sha = job.get("head_sha")
+            new_job.run_attempt = to_int(job.get("run_attempt"))
+            new_job.status = job.get("status")
+            new_job.conclusion = job.get("conclusion")
+            new_job.started_at = parse_date(job.get("started_at"))
+            new_job.completed_at = parse_date(job.get("completed_at"))
+            new_job.runner_id = to_int(job.get("runner_id"))
+            new_job.runner_name = job.get("runner_name")
+            new_job.runner_group_id = to_int(job.get("runner_group_id"))
+            new_job.runner_group_name = job.get("runner_group_name")
+            f = create_job_step
+            new_job.steps = [f(d) for d in job.get("steps")]
+
+            if (self.workflow_id, self.run_id) not in self.parsed_actions['jobs']:
+                self.parsed_actions['jobs'][(self.workflow_id, self.run_id)] = {}
+            self.parsed_actions['jobs'][(self.workflow_id, self.run_id)][str(job.get("id"))] = new_job
+            self.check_diff_run(mongo_job, new_job)
+
+    def get_artifacts(self, mongo_run) -> None:
         """Fetching artifacts data from GitHub API."""
 
         # set what action to run and starting page
@@ -279,17 +363,35 @@ class GitHub:
 
         # constructing the GET url
         url = self.actions_url["artifact"].format(
-            owner=self.owner, repo=self.repo, per_page=self.per_page
+            owner=self.owner, repo=self.repo, run_id=self.run_id, per_page=self.per_page
         )
         github_url = self.api_url + url
 
         # start fetching
-        logger.debug(f"Start fetching artifacts")
-
         result = self.paginating(github_url, "artifacts")
-        self.save_mongo(result, "artifact")
 
-        logger.debug(f"Finish fetching artifacts")
+        for artifact in result:
+            mongo_artifact = None
+            if mongo_run:
+                try:
+                    mongo_artifact = RunArtifact.objects.get(run_id=mongo_run.id, external_id=str(artifact.get("id")))
+                except RunArtifact.DoesNotExist:
+                    mongo_artifact = None
+
+            new_artifact = RunArtifact(external_id=str(artifact.get("id")))
+            new_artifact.name = artifact.get("name")
+            new_artifact.size_in_bytes = to_int(artifact.get("size_in_bytes"))
+            new_artifact.archive_download_url = artifact.get("archive_download_url")
+            new_artifact.expired = bool(artifact.get("expired"))
+            new_artifact.created_at = parse_date(artifact.get("created_at"))
+            new_artifact.updated_at = parse_date(artifact.get("updated_at"))
+            new_artifact.expires_at = parse_date(artifact.get("expires_at"))
+            new_artifact.project_id = self.project.id
+
+            if (self.workflow_id, self.run_id) not in self.parsed_actions['artifacts']:
+                self.parsed_actions['artifacts'][(self.workflow_id, self.run_id)] = {}
+            self.parsed_actions['artifacts'][(self.workflow_id, self.run_id)][str(artifact.get("id"))] = new_artifact
+            self.check_diff_job_artifacts(mongo_artifact, new_artifact)
 
     def __finishing_message(self):
         """
@@ -299,14 +401,19 @@ class GitHub:
         logger.debug(f"Number of stopping: {self.limit_handler_counter}")
         logger.debug("Finished fetching actions.")
 
-    def run(self, last_updated=None) -> None:
+    def run(self) -> None:
         """Collect all action's data form a repository.
 
-        Args:
-            last_updated (Datetime): last_updated for a VCS system.
         """
 
         # verify correct token if any
+
+        last_system = CiSystem.objects.filter(project_id=self.project.id).order_by('-collection_date').first()
+        self.last_system_id = last_system.id if last_system else None
+
+        self.ci_system = CiSystem(project_id=self.project.id, url=self.tracking_url, collection_date=dt.datetime.now())
+        self.ci_system.save()
+
         if self.__token:
             if not self.authenticate_user():
                 sys.exit(1)
@@ -316,13 +423,104 @@ class GitHub:
 
         # fetching actions
         self.get_workflows()
-        self.get_artifacts()
-        self.get_runs(last_updated)
 
-        # logger is used here to not log each time the function executes
-        logger.debug(f"Start fetching jobs")
-        for run in self.runs_ids:
-            self.get_jobs(run)
-        logger.debug(f"Finish fetching jobs")
+        self.save_actions()
 
         self.__finishing_message()
+
+    def save_actions(self):
+        """
+        Iterates through parsed action data and saves relevant workflow, run, job, and artifact configurations
+        based on the detected differences in the 'actions_diff' attribute.
+
+        :return: None
+        """
+
+        for workflow_id, workflow in self.parsed_actions['workflows'].items():
+            if workflow_id in self.actions_diff and self.actions_diff[workflow_id]:
+                workflow.save()
+                if workflow_id not in self.parsed_actions['runs']:
+                    continue
+                for run_id, run in self.parsed_actions['runs'][workflow_id].items():
+                    run.workflow_id = workflow.id
+                    run.save()
+                    for field in ['jobs', 'artifacts']:
+                        if (workflow_id, run_id) not in self.parsed_actions[field]:
+                            continue
+                        for item_id, item in self.parsed_actions[field][(workflow_id, run_id)].items():
+                            item.run_id = run.id
+                            item.save()
+            else:
+                self.old_actions['workflows'][workflow_id]['ci_system_ids'].append(self.ci_system.id)
+                self.old_actions['workflows'][workflow_id].save()
+
+    def check_diff_workflow(self, old, new):
+        """
+        Compares two sets of data representing different workflow configurations,
+        excluding the 'ci_system_ids' attribute from the comparison.
+
+        :param old: dict
+            The old workflow configuration data.
+        :param new: dict
+            The new workflow configuration data.
+
+        :return: None
+        """
+
+        self.check_diff(old, new, 'ci_system_ids')
+
+    def check_diff_run(self, old, new):
+        """
+        Compares two sets of data representing different run configurations
+        and checks for differences in the 'workflow_id' attribute.
+
+        :param old: dict
+            The old run configuration data.
+        :param new: dict
+            The new run configuration data.
+
+        :return: None
+        """
+
+        self.check_diff(old, new, 'workflow_id')
+
+    def check_diff_job_artifacts(self, old, new):
+        """
+        Compares two sets of data representing different job artifacts configurations
+        and checks for differences in the 'run_id' attribute.
+
+        :param old: dict
+            The old job artifacts configuration data.
+        :param new: dict
+            The new job artifacts configuration data.
+
+        :return: None
+        """
+
+        self.check_diff(old, new, 'run_id')
+
+    def check_diff(self, old, new, ex_path):
+        """
+        Compare and identify differences between old and new objects.
+
+        This function compares two objects, `old` and `new`, typically representing data from different
+        states, to identify differences between them. The comparison is performed by utilizing the
+        DeepDiff library. Differences are stored in the `actions_diff` dictionary for the pull request
+        identified by `self.pr_id`. If differences are found, the corresponding key in `actions_diff`
+        is set to `True`.
+
+        :param old: The old object to be compared.
+        :param new: The new object to be compared.
+        :param ex_path: List of paths to be excluded from the comparison.
+
+        """
+        if self.workflow_id not in self.actions_diff:
+            self.actions_diff[self.workflow_id] = False
+
+        if old:
+            diff = DeepDiff(t1=old.__dict__, t2=new.__dict__, exclude_paths=ex_path)
+            if diff:
+                self.actions_diff[self.workflow_id] = True
+        else:
+            self.actions_diff[self.workflow_id] = True
+

@@ -3,11 +3,9 @@ import logging
 import logging.config
 import sys
 import pycoshark.utils as utils
-import datetime
 from actionSHARK.config import Config, init_logger
-from actionSHARK.mongo import Mongo
 from actionSHARK.github import GitHub
-from pycoshark.mongomodels import Project, CISystem
+from pycoshark.mongomodels import Project
 from mongoengine import connect, ConnectionFailure
 
 
@@ -109,7 +107,7 @@ def main():
     try:
         conn = connect(cfg.db_database, host=conn_uri)
     except ConnectionFailure:
-        conn=None
+        conn = None
         logger.error("Failed to connect to MongoDB")
 
     try:
@@ -118,31 +116,24 @@ def main():
         logger.error('Project %s not found!', cfg.project_name)
         sys.exit(1)
 
-    try:
-        ci_system = CISystem.objects.get(url=cfg.tracking_url, project_id=project.id)
-    except CISystem.DoesNotExist:
-        ci_system = CISystem(project_id=project.id, url=cfg.tracking_url)
-
-    last_updated = ci_system.last_updated
-    ci_system.save()
-
-    mongo = Mongo(
-        cfg.db_database,
-        cfg.url,
-        ci_system,
-        conn
-        )
     # initiate GitHub instance
     github = GitHub(
+        tracking_url=cfg.tracking_url,
         owner=cfg.owner,
         repo=cfg.repo,
         token=cfg.token,
-        save_mongo=mongo.upsert_documents,
+        project=project,
     )
-    github.run(last_updated)
-
-    ci_system.last_updated = datetime.datetime.now()
-    ci_system.save()
+    try:
+        github.run()
+    except(KeyboardInterrupt, Exception) as e:
+        logger.error(f"Program did not run successfully. Reason:{e}")
+        logger.info(f"Deleting uncompleted data .....")
+        utils.delete_last_system_data_on_failure('ci_system', cfg.tracking_url, db_user=cfg.db_user,
+                                           db_password=cfg.db_password,
+                                           db_hostname=cfg.db_hostname, db_port=cfg.db_port,
+                                           db_authentication_db=cfg.db_authentication,
+                                           db_ssl=cfg.db_ssl, db_name=cfg.db_database)
 
     # Finish logging message
     logger.debug("Finish Logging")
