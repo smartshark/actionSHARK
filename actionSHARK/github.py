@@ -230,7 +230,7 @@ class GitHub:
             new_workflow.state = workflow.get("state")
             new_workflow.created_at = parse_date(workflow.get("created_at"), True)
             new_workflow.updated_at = parse_date(workflow.get("updated_at"), True)
-            new_workflow.project = self.project.id
+            new_workflow.project_id = self.project.id
 
             self.parsed_actions['workflows'][self.workflow_id] = new_workflow
 

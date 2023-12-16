@@ -15,10 +15,11 @@ setup(
     author_email="ahmad.hatahet@hotmail.com",
     description="Collect data from GitHub actions (workflows, runs, jobs, artifacts)",
     install_requires=[
-        "mongoengine==0.23.1",
+        "mongoengine",
         "pymongo==3.12.2",
         "requests>=2.10.0",
         "pycoshark>=1.3.2",
+        "mongomock"
     ],
     url="https://github.com/smartshark/actionSHARK",
     download_url="https://github.com/smartshark/actionSHARK/zipball/main",

@@ -1,0 +1,21 @@
+[
+  {
+      "id": 1111849070,
+      "node_id": "MDg6QXJ0aWZhY3QxMTExODQ5MDcw",
+      "name": "SARIF file",
+      "size_in_bytes": 74589,
+      "url": "https://api.github.com/repos/apache/commons-rdf/actions/artifacts/1111849070",
+      "archive_download_url": "https://api.github.com/repos/apache/commons-rdf/actions/artifacts/1111849070/zip",
+      "expired": false,
+      "created_at": "2023-12-13T12:52:18Z",
+      "updated_at": "2023-12-13T12:52:19Z",
+      "expires_at": "2023-12-18T12:52:06Z",
+      "workflow_run": {
+        "id": 7195461251,
+        "repository_id": 32505934,
+        "head_repository_id": 32505934,
+        "head_branch": "master",
+        "head_sha": "d0aa1bbe13372e629f7ae205a4c963dd29b4f184"
+      }
+    }
+]

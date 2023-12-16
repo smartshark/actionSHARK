@@ -71,7 +71,7 @@ def run_head_repository_url(value: str) -> str:
     return "https://github.com/" + value + ".git"
 
 
-def commit_object_id( value: Optional[str] = None) -> Optional[ObjectIdField]:
+def commit_object_id(value: Optional[str] = None) -> Optional[ObjectIdField]:
     """
     Find Run object_id from Run collection.
 
@@ -100,7 +100,7 @@ def create_job_step(obj: dict) -> JobStep:
     Args:
         obj (dict): The dict to create a JobStep.
 
-    Retuen:
+    Returns:
         JobStep Object
     """
 
@@ -123,7 +123,7 @@ def create_pull_requests(obj):
     Args:
         obj (dict): The dict to create a RunPullRequest.
 
-    Retuen:
+    Returns:
         RunPullRequest Object
     """
 
