@@ -6,8 +6,6 @@ tests
 notes.md
 *.csv
 *.pickel
-.*
-!/.gitignore
 archive
 
 # Byte-compiled / optimized / DLL files
