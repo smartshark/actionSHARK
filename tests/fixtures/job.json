@@ -1,0 +1,117 @@
+[{
+      "id": 19632879334,
+      "run_id": 7206977332,
+      "workflow_name": "CodeQL",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/apache/commons-rdf/actions/runs/7206977332",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOAfAATs8AAAAEkjX25g",
+      "head_sha": "d0aa1bbe13372e629f7ae205a4c963dd29b4f184",
+      "url": "https://api.github.com/repos/apache/commons-rdf/actions/jobs/19632879334",
+      "html_url": "https://github.com/apache/commons-rdf/actions/runs/7206977332/job/19632879334",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2023-12-14T09:33:22Z",
+      "started_at": "2023-12-14T09:33:28Z",
+      "completed_at": "2023-12-14T09:35:57Z",
+      "name": "Analyze (java)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2023-12-14T09:33:28.000Z",
+          "completed_at": "2023-12-14T09:33:32.000Z"
+        },
+        {
+          "name": "Checkout repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2023-12-14T09:33:32.000Z",
+          "completed_at": "2023-12-14T09:33:33.000Z"
+        },
+        {
+          "name": "Run actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2023-12-14T09:33:33.000Z",
+          "completed_at": "2023-12-14T09:33:36.000Z"
+        },
+        {
+          "name": "Initialize CodeQL",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2023-12-14T09:33:36.000Z",
+          "completed_at": "2023-12-14T09:34:13.000Z"
+        },
+        {
+          "name": "Autobuild",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2023-12-14T09:34:13.000Z",
+          "completed_at": "2023-12-14T09:35:13.000Z"
+        },
+        {
+          "name": "Perform CodeQL Analysis",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2023-12-14T09:35:13.000Z",
+          "completed_at": "2023-12-14T09:35:53.000Z"
+        },
+        {
+          "name": "Post Perform CodeQL Analysis",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2023-12-14T09:35:53.000Z",
+          "completed_at": "2023-12-14T09:35:53.000Z"
+        },
+        {
+          "name": "Post Initialize CodeQL",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2023-12-14T09:35:53.000Z",
+          "completed_at": "2023-12-14T09:35:54.000Z"
+        },
+        {
+          "name": "Post Run actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2023-12-14T09:35:54.000Z",
+          "completed_at": "2023-12-14T09:35:54.000Z"
+        },
+        {
+          "name": "Post Checkout repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2023-12-14T09:35:57.000Z",
+          "completed_at": "2023-12-14T09:35:57.000Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2023-12-14T09:35:54.000Z",
+          "completed_at": "2023-12-14T09:35:54.000Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/apache/commons-rdf/check-runs/19632879334",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 400,
+      "runner_name": "GitHub Actions 49",
+      "runner_group_id": 2,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]

@@ -21,6 +21,8 @@ class Config:
         self.db_authentication = args.db_authentication
         self.db_ssl = args.ssl
         self.logger_level = self.get_logger_level(args.debug)
+        self.project_name = args.project_name
+        self.tracking_url = args.url.rstrip('/')
 
         # if environment variable passed and not concrete token
         if not self.token and args.token_env:
@@ -32,6 +34,7 @@ class Config:
                 f"token: {self.token}",
                 f"owner: {self.owner}",
                 f"repo: {self.repo}",
+                f"project_name: {self.project_name}"
                 f"url: {self.url}",
                 f"db_database: {self.db_database}",
                 f"db_user: {self.db_user}",

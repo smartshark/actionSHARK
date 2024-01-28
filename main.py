@@ -1,11 +1,13 @@
 import os
 import logging
 import logging.config
-
+import sys
 import pycoshark.utils as utils
 from actionSHARK.config import Config, init_logger
-from actionSHARK.mongo import Mongo
 from actionSHARK.github import GitHub
+from pycoshark.mongomodels import Project
+from mongoengine import connect, ConnectionFailure
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -59,6 +61,7 @@ def collect_args():
         required=False,
         type=str,
     )
+    parser.add_argument('-pn', '--project-name', help='Name of the project.', required=True)
 
     # General
     parser.add_argument(
@@ -80,12 +83,20 @@ def main():
     # Start logger
     init_logger(cfg.logger_level)
     logger = logging.getLogger("main")
+    i = logging.StreamHandler(sys.stdout)
+    e = logging.StreamHandler(sys.stderr)
+
+    i.setLevel(logging.DEBUG)
+    e.setLevel(logging.ERROR)
+
+    logger.addHandler(i)
+    logger.addHandler(e)
     logger.debug("Start Logging")
 
     # initiate mongo instance
-    mongo = Mongo(
-        cfg.db_database,
-        cfg.url,
+
+    # get all actions
+    conn_uri = utils.create_mongodb_uri_string(
         cfg.db_user,
         cfg.db_password,
         cfg.db_hostname,
@@ -93,17 +104,36 @@ def main():
         cfg.db_authentication,
         cfg.db_ssl,
     )
+    try:
+        conn = connect(cfg.db_database, host=conn_uri)
+    except ConnectionFailure:
+        conn = None
+        logger.error("Failed to connect to MongoDB")
+
+    try:
+        project = Project.objects.get(name=cfg.project_name)
+    except Project.DoesNotExist:
+        logger.error('Project %s not found!', cfg.project_name)
+        sys.exit(1)
 
     # initiate GitHub instance
     github = GitHub(
+        tracking_url=cfg.tracking_url,
         owner=cfg.owner,
         repo=cfg.repo,
         token=cfg.token,
-        save_mongo=mongo.upsert_documents,
+        project=project,
     )
-
-    # get all actions
-    github.run(mongo.runs)
+    try:
+        github.run()
+    except(KeyboardInterrupt, Exception) as e:
+        logger.error(f"Program did not run successfully. Reason:{e}")
+        logger.info(f"Deleting uncompleted data .....")
+        utils.delete_last_system_data_on_failure('ci_system', cfg.tracking_url, db_user=cfg.db_user,
+                                           db_password=cfg.db_password,
+                                           db_hostname=cfg.db_hostname, db_port=cfg.db_port,
+                                           db_authentication_db=cfg.db_authentication,
+                                           db_ssl=cfg.db_ssl, db_name=cfg.db_database)
 
     # Finish logging message
     logger.debug("Finish Logging")
