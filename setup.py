@@ -19,7 +19,9 @@ setup(
         "pymongo==3.12.2",
         "requests>=2.10.0",
         "pycoshark>=1.3.2",
-        "mongomock"
+        "mongomock",
+        "pytz",
+        "deepdiff"
     ],
     url="https://github.com/smartshark/actionSHARK",
     download_url="https://github.com/smartshark/actionSHARK/zipball/main",

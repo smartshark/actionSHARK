@@ -1,17 +1,16 @@
 from typing import Optional, Any, Tuple, List
 from mongoengine import ObjectIdField
 from pycoshark.mongomodels import Commit, JobStep, RunPullRequest
-import sys
 import datetime as dt
+import dateutil
+import pytz
 
 
-def parse_date(value: Optional[str] = None, is_millisecond: bool = False
-) -> Optional[dt.datetime]:
+def parse_date(value: Optional[str] = None) -> Optional[dt.datetime]:
     """Convert Datetime string to actual Datetime object.
 
     Args:
         value (str): The datetime string to be converted. Defaults to None.
-        is_millisecond (bool, optional): If datetime has millisecond in the string. Defaults to False.
 
     Returns:
         datetime: datetime formated or None if no string passed.
@@ -19,13 +18,10 @@ def parse_date(value: Optional[str] = None, is_millisecond: bool = False
     if not value:
         return None
 
-    date_fmt = "%Y-%m-%dT%H:%M:%S%z"
-    if is_millisecond:
-        date_fmt = "%Y-%m-%dT%H:%M:%S.%f%z"
+    date = dateutil.parser.parse(value)
+    date = date.astimezone(pytz.UTC).replace(tzinfo=None)
 
-    if sys.version_info.minor < 8:
-        date_fmt = date_fmt.replace("%z", "Z")
-    return dt.datetime.strptime(value, date_fmt)
+    return date
 
 
 def to_int(value: Optional[str] = None) -> Optional[int]:
@@ -71,22 +67,23 @@ def run_head_repository_url(value: str) -> str:
     return "https://github.com/" + value + ".git"
 
 
-def commit_object_id(value: Optional[str] = None) -> Optional[ObjectIdField]:
+def commit_object_id(value: Optional[str] = None, vcs_system_id: Optional[str] = None) -> Optional[ObjectIdField]:
     """
     Find Run object_id from Run collection.
 
     Args:
-        value (int): Run id.
+        value (str):  Revision hash.
+        vcs_system_id: VCS system id
 
     Returns:
         Optional[ObjectIdField]
     """
 
-    if not value:
+    if not value or not vcs_system_id:
         return None
 
     try:
-        r = Commit.objects.get(revision_hash=value).id
+        r = Commit.objects.get(revision_hash=value, vcs_system_ids=vcs_system_id).id
     except Commit.DoesNotExist:
         # disable logging just for now, because most of the commits are not in commit collection
         # logger.error(f"Commit not found revision_hash:{value}")
@@ -110,8 +107,8 @@ def create_job_step(obj: dict) -> JobStep:
     job_step.status = obj.get("status")
     job_step.conclusion = obj.get("conclusion")
     job_step.number = to_int(obj.get("number"))
-    job_step.started_at = parse_date(obj.get("started_at"), True)
-    job_step.completed_at = parse_date(obj.get("completed_at"), True)
+    job_step.started_at = parse_date(obj.get("started_at"))
+    job_step.completed_at = parse_date(obj.get("completed_at"))
 
     return job_step
 

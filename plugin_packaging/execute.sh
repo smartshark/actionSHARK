@@ -1,7 +1,7 @@
 #!/bin/sh
 PLUGIN_PATH=${1}
 
-COMMAND="python ${1}/main.py -project-name ${15} --token ${9}  --url ${11}"
+COMMAND="python ${1}/main.py --project-name ${15} --token ${9}  --url ${11}"
 
 if [ ! -z ${2} ] && [ ${2} != "None" ]; then
 	COMMAND="$COMMAND --db-database ${2}"

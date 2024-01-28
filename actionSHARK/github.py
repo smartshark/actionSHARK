@@ -4,7 +4,7 @@ import sys
 import datetime as dt
 import requests
 import logging
-from pycoshark.mongomodels import CiSystem, Project, ActionWorkflow, ActionRun, ActionJob, RunArtifact
+from pycoshark.mongomodels import CiSystem, Project, ActionWorkflow, ActionRun, ActionJob, RunArtifact, VCSSystem
 from .utils import parse_date, to_int, format_repository_url, run_head_repository_url, commit_object_id, create_job_step, create_pull_requests
 from deepdiff import DeepDiff
 
@@ -228,8 +228,8 @@ class GitHub:
             new_workflow.name = workflow.get("name")
             new_workflow.path = workflow.get("path")
             new_workflow.state = workflow.get("state")
-            new_workflow.created_at = parse_date(workflow.get("created_at"), True)
-            new_workflow.updated_at = parse_date(workflow.get("updated_at"), True)
+            new_workflow.created_at = parse_date(workflow.get("created_at"))
+            new_workflow.updated_at = parse_date(workflow.get("updated_at"))
             new_workflow.project_id = self.project.id
 
             self.parsed_actions['workflows'][self.workflow_id] = new_workflow
@@ -289,10 +289,11 @@ class GitHub:
             new_run.triggering_commit_sha = run.get("head_sha")
             new_run.triggering_commit_branch = run.get("head_branch")
             new_run.triggering_commit_message = run["head_commit"].get("message")
-            new_run.triggering_commit_timestamp = run["head_commit"].get("timestamp")
+            new_run.triggering_commit_timestamp = parse_date(run["head_commit"].get("timestamp"))
+
             if run.get("head_repository"):
                 new_run.triggering_repository_url = run_head_repository_url(run["head_repository"].get("full_name"))
-            new_run.triggering_commit_id = commit_object_id(run.get("head_sha"))
+            new_run.triggering_commit_id = commit_object_id(run.get("head_sha"), self.last_vcs_system_id)
 
             if self.workflow_id not in self.parsed_actions['runs']:
                 self.parsed_actions['runs'][self.workflow_id] = {}
@@ -352,7 +353,7 @@ class GitHub:
             if (self.workflow_id, self.run_id) not in self.parsed_actions['jobs']:
                 self.parsed_actions['jobs'][(self.workflow_id, self.run_id)] = {}
             self.parsed_actions['jobs'][(self.workflow_id, self.run_id)][str(job.get("id"))] = new_job
-            self.check_diff_run(mongo_job, new_job)
+            self.check_diff_job_artifacts(mongo_job, new_job)
 
     def get_artifacts(self, mongo_run) -> None:
         """Fetching artifacts data from GitHub API."""
@@ -413,6 +414,9 @@ class GitHub:
 
         self.ci_system = CiSystem(project_id=self.project.id, url=self.tracking_url, collection_date=dt.datetime.now())
         self.ci_system.save()
+
+        last_vcs_system = VCSSystem.objects.filter(url=self.tracking_url).order_by('-collection_date').first()
+        self.last_vcs_system_id = last_vcs_system.id if last_vcs_system else None
 
         if self.__token:
             if not self.authenticate_user():
@@ -518,7 +522,7 @@ class GitHub:
             self.actions_diff[self.workflow_id] = False
 
         if old:
-            diff = DeepDiff(t1=old.__dict__, t2=new.__dict__, exclude_paths=ex_path)
+            diff = DeepDiff(t1=old.to_mongo().to_dict(), t2=new.to_mongo().to_dict(), exclude_paths=[ex_path, '_id'])
             if diff:
                 self.actions_diff[self.workflow_id] = True
         else:

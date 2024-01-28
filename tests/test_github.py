@@ -61,7 +61,7 @@ class TestGithubBackend(unittest.TestCase):
 
         cfg = Namespace(tracking_url='https://localhost/repos/smartshark/test/actions')
         project = Project.objects.get(name='test')
-        vcs_system = VCSSystem(project_id=project.id, url='https://github.com/apache/commons-rdf.git',
+        vcs_system = VCSSystem(project_id=project.id, url='https://localhost/repos/smartshark/test/actions',
                                repository_type='git', collection_date=datetime.datetime.now())
         vcs_system.save()
 
@@ -127,6 +127,61 @@ class TestGithubBackend(unittest.TestCase):
         self.assertEqual(a.project_id, project.id)
 
 
+    @patch('actionSHARK.github.GitHub.paginating', side_effect=mock_return)
+    def test_update_without_change(self, mock_request):
+        """
+        In this test, we save the same workflow twice,We expect the system to recognize that there is no change
+        and add the ci_system_id to the list.
+
+        """
+        cfg = Namespace(tracking_url='https://localhost/repos/smartshark/test/actions')
+        project = Project.objects.get(name='test')
+        gp1 = GitHub(tracking_url=cfg.tracking_url, token='', owner='apache', repo='commons-rdf', project=project)
+        gp1.run()
+        gp2 = GitHub(tracking_url=cfg.tracking_url, token='', owner='apache', repo='commons-rdf', project=project)
+        gp2.run()
+        w = ActionWorkflow.objects.get(external_id='19196438')
+        r = ActionRun.objects.filter(external_id='7206977332')
+        j = ActionJob.objects.filter(external_id='19632879334')
+        a = RunArtifact.objects.filter(external_id='1111849070')
+
+        self.assertEqual(len(w.ci_system_ids), 2)
+        self.assertEqual(len(r), 1)
+        self.assertEqual(len(j), 1)
+        self.assertEqual(len(a), 1)
+
+
+    @patch('actionSHARK.github.GitHub.paginating', side_effect=mock_return)
+    def test_update_with_changes(self, mock_request):
+        """
+        In this test, we save an workflow, make a modification to the same workflow, and attempt to save it again.
+        We expect the system to recognize the change and save the workflow as a different one, without overriding the original
+
+        """
+        cfg = Namespace(tracking_url='https://localhost/repos/smartshark/test/actions')
+        project = Project.objects.get(name='test')
+        gp1 = GitHub(tracking_url=cfg.tracking_url, token='', owner='apache', repo='commons-rdf', project=project)
+        gp1.run()
+        workflow[0]['name'] = 'test'
+        gp2 = GitHub(tracking_url=cfg.tracking_url, token='', owner='apache', repo='commons-rdf', project=project)
+        gp2.run()
+        w = ActionWorkflow.objects.filter(external_id='19196438')
+        r = ActionRun.objects.filter(external_id='7206977332')
+        j = ActionJob.objects.filter(external_id='19632879334')
+        a = RunArtifact.objects.filter(external_id='1111849070')
+
+        self.assertEqual(len(w), 2)
+        self.assertEqual(w[0].ci_system_ids, [gp1.ci_system.id])
+        self.assertEqual(w[1].ci_system_ids, [gp2.ci_system.id])
+        self.assertEqual(len(r), 2)
+        self.assertEqual(r[0].workflow_id, w[0].id)
+        self.assertEqual(r[1].workflow_id, w[1].id)
+        self.assertEqual(len(j), 2)
+        self.assertEqual(j[0].run_id, r[0].id)
+        self.assertEqual(j[1].run_id, r[1].id)
+        self.assertEqual(len(a), 2)
+        self.assertEqual(a[0].run_id, r[0].id)
+        self.assertEqual(a[1].run_id, r[1].id)
 
 
 
