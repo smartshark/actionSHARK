@@ -1,5 +1,36 @@
 {
     "collections": [
+              {
+         "fields":[
+            {
+               "type":"ObjectIdType",
+               "logical_type":"OID",
+               "field_name":"_id",
+               "desc": "Identifier of the document"
+            },
+            {
+               "type":"ObjectIdType",
+               "logical_type":"RID",
+               "reference_to": "project",
+               "field_name":"project_id",
+               "desc": "ObjectID of the project to which this CI system belongs"
+            },
+            {
+               "type":"StringType",
+               "logical_type":"URL",
+               "field_name":"url",
+               "desc": "URL of the CI system (e.g. https://api.github.com/repos/apache/commons-validator/pulls)"
+            },
+            {
+               "type":"DateType",
+               "logical_type":"Date",
+               "field_name":"collection_date",
+               "desc": "Date on which data was gathered from this system"
+            }
+         ],
+         "desc": "CI system of the project (e.g. Github)",
+         "collection_name":"ci_system"
+      },
         {
             "fields": [
                 {
@@ -9,9 +40,16 @@
                     "desc": "Identifier of the workflow"
                 },
                 {
-                    "type": "IntegerType",
+                   "type":"StringType",
+                   "logical_type":"ArrayType",
+                   "reference_to": "ci_system",
+                   "field_name":"ci_system_ids",
+                   "desc": "List of ids that links to the ci systems to which this workflow belongs"
+                },
+                {
+                    "type": "StringType",
                     "logical_type": "ID",
-                    "field_name": "workflow_id",
+                    "field_name": "external_id",
                     "desc": "The GitHub official id of the workflow"
                 },
                 {
@@ -24,7 +62,7 @@
                     "type": "StringType",
                     "logical_type": "Location",
                     "field_name": "path",
-                    "desc": "RRelative path of the workflow yaml file"
+                    "desc": "Relative path of the workflow yaml file"
                 },
                 {
                     "type": "StringType",
@@ -47,20 +85,13 @@
                 {
                     "type": "ObjectIdType",
                     "logical_type": "RID",
-                    "reference_to": "vcs_system",
+                    "reference_to": "project",
                     "field_name": "project_id",
                     "desc": "ObjectID of the project to which this workflow belongs"
-                },
-                {
-                    "type": "ObjectIdType",
-                    "logical_type": "RID",
-                    "reference_to": "vcs_system",
-                    "field_name": "vcs_system_id",
-                    "desc": "ObjectID of the vcs_system to which this workflow belongs"
                 }
             ],
             "desc": "All workflows of a repository",
-            "collection_name": "workflow"
+            "collection_name": "action_workflow"
         },
         {
             "fields": [
@@ -73,7 +104,7 @@
                 {
                     "type": "IntegerType",
                     "logical_type": "ID",
-                    "field_name": "run_id",
+                    "field_name": "external_id",
                     "desc": "The GitHub official id of the run"
                 },
                 {
@@ -103,7 +134,7 @@
                 {
                     "type": "ObjectIdType",
                     "logical_type": "RID",
-                    "reference_to": "workflow",
+                    "reference_to": "action_workflow",
                     "field_name": "workflow_id",
                     "desc": "ObjectID of the workflow to which this run belongs"
                 },
@@ -123,7 +154,7 @@
                         {
                             "type": "ObjectIdType",
                             "logical_type": "RID",
-                            "reference_to": "run",
+                            "reference_to": "action_run",
                             "field_name": "pull_request_id",
                             "desc": "The pull request GitHub id"
                         },
@@ -239,7 +270,7 @@
                 }
             ],
             "desc": "All runs for a workflow",
-            "collection_name": "run"
+            "collection_name": "action_run"
         },
         {
             "fields": [
@@ -252,7 +283,7 @@
                 {
                     "type": "IntegerType",
                     "logical_type": "Other",
-                    "field_name": "job_id",
+                    "field_name": "external_id",
                     "desc": "The GitHub official id of the job"
                 },
                 {
@@ -264,7 +295,7 @@
                 {
                     "type": "ObjectIdType",
                     "logical_type": "RID",
-                    "reference_to": "run",
+                    "reference_to": "action_run",
                     "field_name": "run_id",
                     "desc": "ObjectID of the run to which this job belongs"
                 },
@@ -375,7 +406,7 @@
                 }
             ],
             "desc": "All jobs for each run",
-            "collection_name": "job"
+            "collection_name": "action_job"
         },
         {
             "fields": [
@@ -388,8 +419,15 @@
                 {
                     "type": "IntegerType",
                     "logical_type": "Other",
-                    "field_name": "artifact_id",
+                    "field_name": "external_id",
                     "desc": "The GitHub official id of the artifact"
+                },
+                {
+                    "type": "ObjectIdType",
+                    "logical_type": "RID",
+                    "reference_to": "action_run",
+                    "field_name": "run_id",
+                    "desc": "ObjectID of the run to which this artifact belongs"
                 },
                 {
                     "type": "StringType",
@@ -436,16 +474,9 @@
                 {
                     "type": "ObjectIdType",
                     "logical_type": "RID",
-                    "reference_to": "vcs_system",
+                    "reference_to": "project",
                     "field_name": "project_id",
                     "desc": "ObjectID of the project to which this artifact belongs"
-                },
-                {
-                    "type": "ObjectIdType",
-                    "logical_type": "RID",
-                    "reference_to": "vcs_system",
-                    "field_name": "vcs_system_id",
-                    "desc": "ObjectID of the vcs_system to which this artifact belongs"
                 }
             ],
             "desc": "All artifact for a repository",
