@@ -5,6 +5,7 @@ import logging
 
 from pycoshark.utils import create_mongodb_uri_string
 from pycoshark.mongomodels import VCSSystem, Commit
+from mongoengine.context_managers import switch_collection
 
 from mongoengine import connect
 from mongoengine import (
@@ -476,7 +477,7 @@ class Mongo:
             return None
 
         try:
-            r = Workflow.objects.get(workflow_id=v_workflow_id).id
+            r = Workflow.objects.filter(workflow_id=v_workflow_id).first().id
         except Workflow.DoesNotExist:
             r = None
 
@@ -487,7 +488,7 @@ class Mongo:
             )
 
         try:
-            r = Workflow.objects.get(workflow_id=v_workflow_id).id
+            r = Workflow.objects.filter(workflow_id=v_workflow_id).first().id
         except Workflow.DoesNotExist:
             logger.error(
                 f"Workflow not found, workflow_id:{v_workflow_id}, name:{v_name}"
@@ -509,7 +510,9 @@ class Mongo:
             Optional(ObjectIdField, ObjectIdField)
         """
         try:
-            r = VCSSystem.objects.get(url=value)
+            with switch_collection(VCSSystem, "v_c_s_system") as VCSSystemClass:
+                base = value.rstrip("/").replace(".git", "")
+                r = VCSSystemClass.objects.get(url__in=[base, base + "/", base + ".git"])
         except VCSSystem.DoesNotExist:
             logger.error(
                 f"VCSSystem does not have the url:{value} to fetch project_id and vcs_system_id"
@@ -583,11 +586,13 @@ class Mongo:
             return None
 
         date_fmt = "%Y-%m-%dT%H:%M:%S%z"
-        if is_millisecond:
+        if is_millisecond and "." in value:
             date_fmt = "%Y-%m-%dT%H:%M:%S.%f%z"
-
         if sys.version_info.minor < 8:
-            date_fmt = date_fmt.replace("%z", "Z")
+            if "+" in value and ":" == value[-3]:
+                value = value[:-3] + value[-2:]  # Convert +01:00 to +0100 for Python 3.7 %z
+            else:
+                date_fmt = date_fmt.replace("%z", "Z")
         return dt.datetime.strptime(value, date_fmt)
 
     def __to_int(self, value: Optional[str] = None) -> Optional[int]:

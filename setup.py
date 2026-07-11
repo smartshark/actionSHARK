@@ -18,7 +18,7 @@ setup(
         "mongoengine==0.23.1",
         "pymongo==3.12.2",
         "requests>=2.10.0",
-        "pycoshark>=1.3.2",
+        "pycoshark @ git+https://github.com/smartshark/pycoSHARK.git@2.0.0",
     ],
     url="https://github.com/smartshark/actionSHARK",
     download_url="https://github.com/smartshark/actionSHARK/zipball/main",
