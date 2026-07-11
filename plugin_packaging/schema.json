@@ -47,14 +47,14 @@
                 {
                     "type": "ObjectIdType",
                     "logical_type": "RID",
-                    "reference_to": "vcs_system",
+                    "reference_to": "v_c_s_system",
                     "field_name": "project_id",
                     "desc": "ObjectID of the project to which this workflow belongs"
                 },
                 {
                     "type": "ObjectIdType",
                     "logical_type": "RID",
-                    "reference_to": "vcs_system",
+                    "reference_to": "v_c_s_system",
                     "field_name": "vcs_system_id",
                     "desc": "ObjectID of the vcs_system to which this workflow belongs"
                 }
@@ -436,14 +436,14 @@
                 {
                     "type": "ObjectIdType",
                     "logical_type": "RID",
-                    "reference_to": "vcs_system",
+                    "reference_to": "v_c_s_system",
                     "field_name": "project_id",
                     "desc": "ObjectID of the project to which this artifact belongs"
                 },
                 {
                     "type": "ObjectIdType",
                     "logical_type": "RID",
-                    "reference_to": "vcs_system",
+                    "reference_to": "v_c_s_system",
                     "field_name": "vcs_system_id",
                     "desc": "ObjectID of the vcs_system to which this artifact belongs"
                 }
